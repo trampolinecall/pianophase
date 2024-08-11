@@ -259,7 +259,7 @@ fn pat2_2() -> Pattern {
 }
 
 fn pat2_into_3() -> Pattern {
-    Pattern(pat2_2().0[0..2].to_vec())
+    Pattern(vec![64, 76, 69, 71, 74, 76])
 }
 
 fn pat3() -> Pattern {
