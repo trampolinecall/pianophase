@@ -1,38 +1,31 @@
-use num_traits::ToPrimitive;
-use sfml::{
-    graphics::{Color, RectangleShape, RenderTarget, RenderWindow, Shape, Transformable},
-    window::{Event, Style},
+use macroquad::{
+    color::{self, Color},
+    shapes::{draw_arc, draw_circle, draw_line, draw_rectangle, draw_rectangle_ex},
+    window::clear_background,
 };
+use num_traits::{FloatConst, ToPrimitive};
 
 use crate::{
     music::{Part, PianoPhase},
     timing::Timing,
+    visualizer::notation::Font,
 };
 
+mod notation;
+
 pub struct Visualizer {
-    window: RenderWindow,
+    font: Font,
 }
 
 impl Visualizer {
-    pub fn new() -> Visualizer {
-        let mut window = RenderWindow::new((1280, 720), "Piano Phase", Style::CLOSE, &Default::default());
-        window.set_framerate_limit(60);
-
-        Visualizer { window }
+    pub fn new() -> Result<Visualizer, Box<dyn std::error::Error>> {
+        Ok(Visualizer { font: Font::load_bravura()? })
     }
 
     pub fn update(&mut self, timing: &Timing, music: &PianoPhase) -> bool {
-        while let Some(event) = self.window.poll_event() {
-            if event == Event::Closed {
-                self.window.close();
-                return false;
-            }
-        }
-        self.window.set_active(true);
-
         let current_time = timing.current_musical_time(music);
 
-        self.window.clear(Color::BLACK);
+        clear_background(color::BLACK);
 
         let part1_segment_index = music.part1.find_current_segment(current_time);
         let part2_segment_index = music.part2.find_current_segment(current_time);
@@ -46,38 +39,24 @@ impl Visualizer {
             let offset_in_pattern =
                 ((current_time.to_f32().unwrap() - segment_start.to_f32().unwrap()) / segment.single_pattern_duration().to_f32().unwrap()).fract();
             let offset_in_pattern_rounded = (offset_in_pattern * segment.pattern.0.len() as f32).floor() / segment.pattern.0.len() as f32;
-            let offset_in_pattern_rounded_interp = (offset_in_pattern * segment.pattern.0.len() as f32).fract();
 
             let current_dynamic = segment.dynamic.interpolate(offset_in_segment);
 
-            let mut spinner = RectangleShape::new();
-            spinner.set_size((100.0, 10.0));
-            spinner.set_origin((5.0, 5.0));
-            spinner.set_position((center_x, center_y));
-            spinner.set_rotation(
-                360.0 * (offset_in_pattern_rounded + offset_in_pattern_rounded_interp.powf(3.0) / segment.pattern.0.len() as f32) - 90.0,
-            );
+            let color = Color::from_rgba(255, 255, 255, (255.0 * current_dynamic) as u8);
 
-            spinner.set_fill_color(Color::rgba(255, 255, 255, (current_dynamic * 255.0) as u8));
+            let spinner_end_x = center_x + (offset_in_pattern * f32::TAU()).cos() * 100.0;
+            let spinner_end_y = center_y + (offset_in_pattern * f32::TAU()).sin() * 100.0;
+            draw_line(center_x, center_y, spinner_end_x, spinner_end_y, 10.0, color);
 
-            let mut edge_square = RectangleShape::new();
-            edge_square.set_size((10.0, 10.0));
-            edge_square.set_origin((-100.0, 5.0));
-            edge_square.set_position((center_x, center_y));
-            edge_square.set_rotation(360.0 * offset_in_pattern - 90.0);
+            let dot_x = center_x + (offset_in_pattern_rounded * f32::TAU()).cos() * 120.0;
+            let dot_y = center_y + (offset_in_pattern_rounded * f32::TAU()).sin() * 120.0;
+            draw_circle(dot_x, dot_y, 7.0, color);
 
-            edge_square.set_fill_color(Color::rgba(255, 255, 255, (current_dynamic * 255.0) as u8));
-
-            // TODO: draw circular staff
-
-            self.window.draw(&spinner);
-            self.window.draw(&edge_square);
+            draw_arc(center_x, center_y, 56, 150.0, 0.0, 10.0, 360.0 * offset_in_pattern, color);
         };
 
         draw_wheel(1280.0 * 0.25, 720.0 / 2.0, &music.part1, part1_segment_index);
         draw_wheel(1280.0 * 0.75, 720.0 / 2.0, &music.part2, part2_segment_index);
-
-        self.window.display();
 
         true
     }
