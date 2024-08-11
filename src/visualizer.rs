@@ -1,11 +1,11 @@
 use macroquad::{
     color::{self, Color},
-    shapes::{draw_arc, draw_circle, draw_line, draw_rectangle, draw_rectangle_ex},
+    shapes::{draw_arc, draw_circle, draw_line},
     text::{draw_text_ex, TextParams},
     window::clear_background,
 };
 use num_traits::{FloatConst, ToPrimitive};
-use smufl::{Coord, Metadata, StaffSpaces};
+use smufl::{Coord, StaffSpaces};
 
 use crate::{
     music::{Part, PianoPhase},
@@ -92,6 +92,7 @@ impl Visualizer {
             enum Accidental {
                 Natural,
                 Sharp,
+                #[allow(dead_code)]
                 Flat,
             }
             let pitch_to_y_position = |note| match note {

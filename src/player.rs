@@ -49,14 +49,9 @@ impl Player {
         let last_time = timing.last_musical_time(music);
         let this_time = timing.current_musical_time(music);
 
-        fn choose_slice(notes: &[FlattenedNote], start: impl Fn(&FlattenedNote) -> bool, end: impl Fn(&FlattenedNote) -> bool) -> &[FlattenedNote] {
-            let start_ind = notes.partition_point(start);
-            let end_ind = notes.partition_point(end);
-            &notes[start_ind..end_ind]
-        }
         let update_part = |part: &Part, channel: i32| {
-            let notes_released = choose_slice(&part.1, move |n| n.time + n.length < last_time, move |n| n.time + n.length < this_time);
-            let notes_pressed = choose_slice(&part.1, move |n| n.time < last_time, move |n| n.time < this_time);
+            let notes_released = part.find_note_range(|n| n.time + n.length < last_time, |n| n.time + n.length < this_time);
+            let notes_pressed = part.find_note_range(|n| n.time < last_time, |n| n.time < this_time);
 
             {
                 let mut synth = self.synthesizer.lock().unwrap();

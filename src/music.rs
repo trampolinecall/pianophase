@@ -108,6 +108,12 @@ impl Part {
             Err(index) => panic!("searching for segment for time {time} resulted in index {index}, segments {:?}", self.0),
         }
     }
+
+    pub fn find_note_range(&self, start: impl Fn(&FlattenedNote) -> bool, end: impl Fn(&FlattenedNote) -> bool) -> &[FlattenedNote] {
+        let start_ind = self.1.partition_point(start);
+        let end_ind = self.1.partition_point(end);
+        &self.1[start_ind..end_ind]
+    }
 }
 
 impl Segment {
