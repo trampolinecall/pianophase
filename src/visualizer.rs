@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use macroquad::{
     color::{self, Color},
     shapes::{draw_arc, draw_circle, draw_line},
@@ -14,9 +12,13 @@ use crate::{
     music::{Part, PianoPhase, Segment},
     timing::Timing,
     util::{lerp, remap},
-    visualizer::notation::{Font, StaffParams},
+    visualizer::{
+        colors::ColorExt,
+        notation::{Font, StaffParams},
+    },
 };
 
+mod colors;
 mod notation;
 
 pub struct Visualizer {
@@ -29,7 +31,7 @@ impl Visualizer {
     }
 
     pub fn update(&mut self, timing: &Timing, music: &PianoPhase) -> bool {
-        clear_background(color::BLACK);
+        clear_background(colors::BACKGROUND_COLOR);
 
         let current_time = timing.current_musical_time(music);
 
@@ -60,7 +62,7 @@ fn draw_wheel(current_time: f32, segment: &Segment, center_x: f32, center_y: f32
 
     let current_dynamic = segment.dynamic.interpolate(offset_in_segment);
 
-    let color = Color::from_rgba(255, 255, 255, (255.0 * current_dynamic) as u8);
+    let color = colors::FOREGROUND_COLOR.set_a(current_dynamic);
 
     let spinner_end_x = center_x + (offset_in_pattern * f32::TAU() - f32::PI() / 2.0).cos() * spinner_radius;
     let spinner_end_y = center_y + (offset_in_pattern * f32::TAU() - f32::PI() / 2.0).sin() * spinner_radius;
@@ -114,15 +116,7 @@ fn draw_in_sync_staff(music: &PianoPhase, current_time: f32, font: &Font) {
                 1.0,
             );
 
-            draw_note(
-                font,
-                &STAFF_PARAMS,
-                staff_top_y,
-                note_x,
-                note.pitch,
-                stem_end_y,
-                Color::from_rgba(255, 255, 255, (255.0 * note.volume * note_fade) as u8),
-            );
+            draw_note(font, &STAFF_PARAMS, staff_top_y, note_x, note.pitch, stem_end_y, colors::FOREGROUND_COLOR.set_a(note.volume * note_fade));
 
             let part_segment_index = part.find_segment_for_time(note.time.to_f32().unwrap());
             if let Some(part_segment_index) = part_segment_index {
@@ -155,7 +149,7 @@ fn draw_in_sync_staff(music: &PianoPhase, current_time: f32, font: &Font) {
                     2,
                     stem_end_y,
                     subsequent_beams_up,
-                    Color::from_rgba(255, 255, 255, (255.0 * note.volume * note_fade) as u8),
+                    colors::FOREGROUND_COLOR.set_a(note.volume * note_fade),
                 );
             }
         }
@@ -198,7 +192,7 @@ fn draw_staff(font: &Font, staff_params: &StaffParams, left: f32, right: f32, to
             right,
             top + i as f32 * staff_params.staff_space as f32,
             line_thickness,
-            color::WHITE,
+            colors::FOREGROUND_COLOR,
         );
     }
 }
