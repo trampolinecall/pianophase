@@ -91,8 +91,6 @@ fn draw_in_sync_staff(music: &PianoPhase, current_time: f32, font: &Font) {
             |note| note.time.to_f32().unwrap() <= current_time.to_f32().unwrap(),
         );
 
-        println!("{:?}", window_duration);
-
         for note in notes {
             let note_segment = &music.part1.segments[music.part1.find_segment_for_time(note.time.to_f32().unwrap()).unwrap()];
             let note_x = remap(
