@@ -57,7 +57,7 @@ impl<'font> Staff<'font> {
                 (Vec2::new(left + x * self.staff_space as f32, top + y * self.staff_space as f32), 0.0)
             }
             StaffPosition::Circular { center_x, center_y, outer_radius } => {
-                (circle_coord(center_x, center_y, outer_radius - y * self.staff_space as f32, x - f32::PI() / 2.0), x)
+                (circle_coord(center_x, center_y, radius_for_y(outer_radius, y, self.staff_space as f32), x - f32::PI() / 2.0), x)
             }
         }
     }
@@ -133,7 +133,16 @@ impl<'font> Staff<'font> {
         // drawing the accidental
         if let Accidental::Sharp | Accidental::Flat = accidental {
             const ACCIDENTAL_SHIFT: StaffSpaces = StaffSpaces(1.5);
-            let (accidental_position, accidental_rotation) = self.calculate_position(x_coord_on_staff - ACCIDENTAL_SHIFT.0 as f32, y_coord_on_staff);
+            // because the x position means the angle for circular staves, we need to actually calculate the angle if the accidental is shifted
+            // left by 1.5 staff spaces because shifting left by 1.5 radians is not the desired behavior
+            let accidental_x = match self.position {
+                StaffPosition::Straight { top: _, left: _, right: _ } => x_coord_on_staff - ACCIDENTAL_SHIFT.0 as f32,
+                StaffPosition::Circular { center_x: _, center_y: _, outer_radius } => {
+                    x_coord_on_staff - d_staff_spaces_to_radians(outer_radius, self.staff_space as f32, ACCIDENTAL_SHIFT.0 as f32, y_coord_on_staff)
+                }
+            };
+
+            let (accidental_position, accidental_rotation) = self.calculate_position(accidental_x, y_coord_on_staff);
             draw_text_ex(
                 &match accidental {
                     Accidental::Natural => unreachable!(),
@@ -155,9 +164,15 @@ impl<'font> Staff<'font> {
         } else {
             optional_coord_to_tuple(self.font.metadata.anchors.get(smufl::Glyph::NoteheadBlack).and_then(|anchors| anchors.stem_down_nw))
         };
+        let stem_x = match self.position {
+            StaffPosition::Straight { top: _, left: _, right: _ } => x_coord_on_staff + stem_origin.x,
+            StaffPosition::Circular { center_x: _, center_y: _, outer_radius } => {
+                x_coord_on_staff + d_staff_spaces_to_radians(outer_radius, self.staff_space as f32, stem_origin.x, y_coord_on_staff)
+            }
+        };
         {
-            let (stem_start_drawn_position, _) = self.calculate_position(x_coord_on_staff + stem_origin.x, y_coord_on_staff + stem_origin.y);
-            let (stem_end_drawn_position, _) = self.calculate_position(x_coord_on_staff + stem_origin.x, stem_end_y);
+            let (stem_start_drawn_position, _) = self.calculate_position(stem_x, y_coord_on_staff + stem_origin.y);
+            let (stem_end_drawn_position, _) = self.calculate_position(stem_x, stem_end_y);
 
             draw_line(
                 stem_start_drawn_position.x,
@@ -173,8 +188,8 @@ impl<'font> Staff<'font> {
         {
             let beam_bounds = match (beam_left, beam_right) {
                 (None, None) => None,
-                (None, Some(right)) => Some((x_coord_on_staff + stem_origin.x, right)),
-                (Some(left), None) => Some((left, x_coord_on_staff + stem_origin.x)),
+                (None, Some(right)) => Some((stem_x, right)),
+                (Some(left), None) => Some((left, stem_x)),
                 (Some(left), Some(right)) => Some((left, right)),
             };
 
@@ -203,11 +218,11 @@ impl<'font> Staff<'font> {
                             draw_arc(
                                 center_x,
                                 center_y,
-                                8,
-                                outer_radius - current_y,
-                                beam_left,
-                                beam_right - beam_left,
+                                48,
+                                radius_for_y(outer_radius, current_y, self.staff_space as f32),
+                                beam_left.to_degrees() - 90.0,
                                 beam_thickness * self.staff_space as f32,
+                                (beam_right - beam_left).to_degrees(),
                                 color,
                             );
                         }
@@ -225,5 +240,14 @@ pub fn coord_to_tuple(coord: Coord) -> Vec2 {
 }
 
 pub fn optional_coord_to_tuple(coord: Option<Coord>) -> Vec2 {
-    coord.map(|c| coord_to_tuple(c)).unwrap_or(Vec2::new(0.0, 0.0))
+    coord.map(coord_to_tuple).unwrap_or(Vec2::new(0.0, 0.0))
+}
+
+fn radius_for_y(outer_radius: f32, y: f32, staff_space: f32) -> f32 {
+    outer_radius - y * staff_space
+}
+
+fn d_staff_spaces_to_radians(outer_radius: f32, staff_space: f32, d_staff_spaces: f32, y: f32) -> f32 {
+    let circle_radius = radius_for_y(outer_radius, y, staff_space);
+    d_staff_spaces * staff_space / circle_radius
 }

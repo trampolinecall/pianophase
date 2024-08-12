@@ -37,21 +37,49 @@ impl Visualizer {
 
         const SPINNER_LENGTH: f32 = 100.0;
         const ARC_RADIUS: f32 = 150.0;
+        const STAFF_RADIUS: f32 = 250.0;
         // TODO: adjust to window size
         if let Some(part1_segment_index) = part1_segment_index {
-            draw_wheel(current_time, &music.part1.segments[part1_segment_index], 1280.0 * 0.25, 720.0 / 2.0, SPINNER_LENGTH, ARC_RADIUS);
+            draw_wheel(
+                &self.font,
+                current_time,
+                &music.part1.segments[part1_segment_index],
+                1280.0 * 0.25,
+                720.0 / 2.0,
+                SPINNER_LENGTH,
+                ARC_RADIUS,
+                STAFF_RADIUS,
+            );
         }
         if let Some(part2_segment_index) = part2_segment_index {
-            draw_wheel(current_time, &music.part2.segments[part2_segment_index], 1280.0 * 0.75, 720.0 / 2.0, SPINNER_LENGTH, ARC_RADIUS);
+            draw_wheel(
+                &self.font,
+                current_time,
+                &music.part2.segments[part2_segment_index],
+                1280.0 * 0.75,
+                720.0 / 2.0,
+                SPINNER_LENGTH,
+                ARC_RADIUS,
+                STAFF_RADIUS,
+            );
         }
 
-        draw_in_sync_staff(music, current_time, &self.font);
+        draw_in_sync_staff(&self.font, music, current_time);
 
         true
     }
 }
 
-fn draw_wheel(current_time: f32, segment: &Segment, center_x: f32, center_y: f32, spinner_radius: f32, arc_radius: f32) {
+fn draw_wheel(
+    font: &Font,
+    current_time: f32,
+    segment: &Segment,
+    center_x: f32,
+    center_y: f32,
+    spinner_radius: f32,
+    arc_radius: f32,
+    staff_outer_radius: f32,
+) {
     let offset_in_segment =
         (current_time - segment.start_time.to_f32().unwrap()) / (segment.end_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap());
     let current_measure = segment.find_measure(current_time);
@@ -71,9 +99,29 @@ fn draw_wheel(current_time: f32, segment: &Segment, center_x: f32, center_y: f32
     draw_circle(dot_x, dot_y, 7.0, color);
 
     draw_arc(center_x, center_y, 56, arc_radius, -90.0, 10.0, 360.0 * offset_in_measure, color);
+
+    let staff = Staff::new(font, StaffPosition::Circular { center_x, center_y, outer_radius: staff_outer_radius }, 10);
+    staff.draw();
+    for (note_i, note) in segment.pattern.0.iter().enumerate() {
+        let note_angle = remap(note_i as f32, 0.0, segment.pattern.0.len() as f32, 0.0, f32::TAU());
+
+        // only the first and last notes draw beams to simplify things
+        // we can't just draw to a fixed offset because that would draw the beam to a certain angle which doesn't account for the stem offset
+        let (beam_left, beam_right) = if note_i == 0 {
+            // draw a beam from the first note to the bottom of the staff
+            (None, Some(f32::PI()))
+        } else if note_i == segment.pattern.0.len() - 1 {
+            // draw a beam from the bottom of the staff to the last note
+            (Some(f32::PI()), None)
+        } else {
+            (None, None)
+        };
+
+        staff.draw_note(note_angle, *note, colors::FOREGROUND_COLOR, -3.0, 2, beam_left, beam_right)
+    }
 }
 
-fn draw_in_sync_staff(music: &PianoPhase, current_time: f32, font: &Font) {
+fn draw_in_sync_staff(font: &Font, music: &PianoPhase, current_time: f32) {
     const STAFF_LEFT: f32 = 200.0;
     const STAFF_1_TOP_Y: f32 = 600.0;
     const STAFF_2_TOP_Y: f32 = 700.0;
