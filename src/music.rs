@@ -87,19 +87,20 @@ impl Part {
     }
 }
 
+pub struct Measure {
+    pub start_time: Rational32,
+    pub end_time: Rational32,
+}
 impl Segment {
-    pub fn single_pattern_duration(&self) -> Rational32 {
+    pub fn single_measure_duration(&self) -> Rational32 {
         Ratio::from_integer(self.pattern.0.len() as i32) / self.speed
     }
-    pub fn offset_in_pattern(&self, time: f32) -> f32 {
-        ((time - self.start_time.to_f32().unwrap()) / self.single_pattern_duration().to_f32().unwrap()).fract()
-    }
-    pub fn pattern_bounds(&self, time: f32) -> (f32, f32) {
-        let start = ((time - self.start_time.to_f32().unwrap()) / self.single_pattern_duration().to_f32().unwrap()).floor()
-            * self.single_pattern_duration().to_f32().unwrap()
-            + self.start_time.to_f32().unwrap();
-        let end = start + self.single_pattern_duration().to_f32().unwrap();
-        (start, end)
+    pub fn find_measure(&self, time: f32) -> Measure {
+        let repetition_number = ((time - self.start_time.to_f32().unwrap()) / self.single_measure_duration().to_f32().unwrap()).floor() as i32;
+        let start_time = Ratio::from_integer(repetition_number) * self.single_measure_duration() + self.start_time;
+        let end_time = start_time + self.single_measure_duration();
+
+        Measure { start_time, end_time }
     }
 }
 

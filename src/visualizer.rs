@@ -57,22 +57,23 @@ impl Visualizer {
 fn draw_wheel(current_time: f32, segment: &Segment, center_x: f32, center_y: f32, spinner_radius: f32, arc_radius: f32) {
     let offset_in_segment =
         (current_time - segment.start_time.to_f32().unwrap()) / (segment.end_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap());
-    let offset_in_pattern = segment.offset_in_pattern(current_time);
-    let offset_in_pattern_rounded = (offset_in_pattern * segment.pattern.0.len() as f32).floor() / segment.pattern.0.len() as f32;
+    let current_measure = segment.find_measure(current_time);
+    let offset_in_measure = remap(current_time, current_measure.start_time.to_f32().unwrap(), current_measure.end_time.to_f32().unwrap(), 0.0, 1.0);
+    let offset_in_measure_rounded = (offset_in_measure * segment.pattern.0.len() as f32).floor() / segment.pattern.0.len() as f32;
 
     let current_dynamic = segment.dynamic.interpolate(offset_in_segment);
 
     let color = colors::FOREGROUND_COLOR.set_a(current_dynamic);
 
-    let spinner_end_x = center_x + (offset_in_pattern * f32::TAU() - f32::PI() / 2.0).cos() * spinner_radius;
-    let spinner_end_y = center_y + (offset_in_pattern * f32::TAU() - f32::PI() / 2.0).sin() * spinner_radius;
+    let spinner_end_x = center_x + (offset_in_measure * f32::TAU() - f32::PI() / 2.0).cos() * spinner_radius;
+    let spinner_end_y = center_y + (offset_in_measure * f32::TAU() - f32::PI() / 2.0).sin() * spinner_radius;
     draw_line(center_x, center_y, spinner_end_x, spinner_end_y, 10.0, color);
 
-    let dot_x = center_x + (offset_in_pattern_rounded * f32::TAU() - f32::PI() / 2.0).cos() * ((spinner_radius + arc_radius) / 2.0);
-    let dot_y = center_y + (offset_in_pattern_rounded * f32::TAU() - f32::PI() / 2.0).sin() * ((spinner_radius + arc_radius) / 2.0);
+    let dot_x = center_x + (offset_in_measure_rounded * f32::TAU() - f32::PI() / 2.0).cos() * ((spinner_radius + arc_radius) / 2.0);
+    let dot_y = center_y + (offset_in_measure_rounded * f32::TAU() - f32::PI() / 2.0).sin() * ((spinner_radius + arc_radius) / 2.0);
     draw_circle(dot_x, dot_y, 7.0, color);
 
-    draw_arc(center_x, center_y, 56, arc_radius, -90.0, 10.0, 360.0 * offset_in_pattern, color);
+    draw_arc(center_x, center_y, 56, arc_radius, -90.0, 10.0, 360.0 * offset_in_measure, color);
 }
 
 fn draw_in_sync_staff(music: &PianoPhase, current_time: f32, font: &Font) {
@@ -99,13 +100,13 @@ fn draw_in_sync_staff(music: &PianoPhase, current_time: f32, font: &Font) {
         for note in notes {
             // TODO: clean up this code
             let base_speed_segment = &music.part1.segments[music.part1.find_segment_for_time(note.time.to_f32().unwrap()).unwrap()];
-            let base_speed_pattern_bounds = base_speed_segment.pattern_bounds(note.time.to_f32().unwrap());
+            let base_speed_measure = base_speed_segment.find_measure(note.time.to_f32().unwrap());
             let note_x = remap(
                 note.time.to_f32().unwrap(),
-                base_speed_pattern_bounds.0,
-                base_speed_pattern_bounds.1,
+                base_speed_measure.start_time.to_f32().unwrap(),
+                base_speed_measure.end_time.to_f32().unwrap(),
                 STAFF_LEFT,
-                STAFF_LEFT + base_speed_segment.single_pattern_duration().to_f32().unwrap() * NOTE_HORIZ_SPACE,
+                STAFF_LEFT + base_speed_segment.single_measure_duration().to_f32().unwrap() * NOTE_HORIZ_SPACE,
             );
 
             let note_fade = remap(
@@ -121,24 +122,24 @@ fn draw_in_sync_staff(music: &PianoPhase, current_time: f32, font: &Font) {
             let part_segment_index = part.find_segment_for_time(note.time.to_f32().unwrap());
             if let Some(part_segment_index) = part_segment_index {
                 let part_segment = &part.segments[part_segment_index];
-                let part_pattern_bounds = part_segment.pattern_bounds(note.time.to_f32().unwrap());
+                let part_measure = part_segment.find_measure(note.time.to_f32().unwrap());
 
                 // TODO: fix overalpping beams
                 // TODO: fading is messed up because the same beam will be drawn multiple times
                 // TODO: shift beam to the stem offset
                 let beam_start_x = remap(
-                    part_pattern_bounds.0,
-                    base_speed_pattern_bounds.0,
-                    base_speed_pattern_bounds.1,
+                    part_measure.start_time.to_f32().unwrap(),
+                    base_speed_measure.start_time.to_f32().unwrap(),
+                    base_speed_measure.end_time.to_f32().unwrap(),
                     STAFF_LEFT,
-                    STAFF_LEFT + base_speed_segment.single_pattern_duration().to_f32().unwrap() * NOTE_HORIZ_SPACE,
+                    STAFF_LEFT + base_speed_segment.single_measure_duration().to_f32().unwrap() * NOTE_HORIZ_SPACE,
                 );
                 let beam_end_x = remap(
-                    part_pattern_bounds.1 - 1.0,
-                    base_speed_pattern_bounds.0,
-                    base_speed_pattern_bounds.1,
+                    part_measure.end_time.to_f32().unwrap() - 1.0,
+                    base_speed_measure.start_time.to_f32().unwrap(),
+                    base_speed_measure.end_time.to_f32().unwrap(),
                     STAFF_LEFT,
-                    STAFF_LEFT + base_speed_segment.single_pattern_duration().to_f32().unwrap() * NOTE_HORIZ_SPACE,
+                    STAFF_LEFT + base_speed_segment.single_measure_duration().to_f32().unwrap() * NOTE_HORIZ_SPACE,
                 );
 
                 draw_beam(
@@ -157,7 +158,7 @@ fn draw_in_sync_staff(music: &PianoPhase, current_time: f32, font: &Font) {
 
     let part1_segment_index = music.part1.find_segment_for_time(current_time);
     if let Some(part1_segment_index) = part1_segment_index {
-        let part1_segment_length = music.part1.segments[part1_segment_index].single_pattern_duration();
+        let part1_segment_length = music.part1.segments[part1_segment_index].single_measure_duration();
 
         draw_past_notes(&music.part1, part1_segment_length, STAFF_1_TOP_Y, STAFF_1_TOP_Y - 3.0 * STAFF_PARAMS.staff_space as f32, false);
         draw_past_notes(
