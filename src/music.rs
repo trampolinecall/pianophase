@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 
+use itertools::Itertools;
 use num_rational::{Ratio, Rational32};
 use num_traits::ToPrimitive;
 
@@ -28,7 +29,23 @@ pub struct Segment {
     pub end_time: Rational32,
 }
 #[derive(Clone, Debug)]
-pub struct Pattern(pub Vec<u8>);
+pub struct Pattern(pub Vec<Note>);
+impl Pattern {
+    fn from_pitches(pitches: Vec<u8>) -> Pattern {
+        let hands = std::iter::repeat(Hand::Left).interleave(std::iter::repeat(Hand::Right));
+        Pattern(pitches.into_iter().zip(hands).map(|(pitch, hand)| Note { pitch, hand }).collect())
+    }
+}
+#[derive(Clone, Debug)]
+pub struct Note {
+    pub pitch: u8,
+    pub hand: Hand,
+}
+#[derive(Clone, Debug, Copy)]
+pub enum Hand {
+    Left,
+    Right,
+}
 #[derive(Debug, PartialEq, Eq)]
 pub enum Dynamic {
     Crescendo,
@@ -43,8 +60,10 @@ pub struct FlattenedNote {
     pub time: Rational32,
     pub length: Rational32,
     pub volume: f32,
+    pub hand: Hand,
 
     pub segment_index: usize,
+    pub measure_number: usize,
 }
 
 impl PianoPhase {
@@ -132,15 +151,17 @@ impl PartBuilder {
         let segment_index = self.segments.len();
         let total_number_of_notes = pattern.0.len() as i32 * repetitions as i32;
         let mut note_index = 0;
-        for _ in 0..repetitions {
+        for measure_number in 0..(repetitions as usize) {
             for note in &pattern.0 {
                 if dynamic != Dynamic::Silent {
                     self.flattened.push(FlattenedNote {
-                        pitch: *note,
+                        pitch: note.pitch,
                         time: self.current_time,
                         length: Ratio::ONE / speed,
                         volume: dynamic.interpolate(note_index as f32 / total_number_of_notes as f32),
                         segment_index,
+                        hand: note.hand,
+                        measure_number,
                     });
                 }
 
@@ -267,21 +288,21 @@ fn parts(shorten: bool) -> (Part, Part) {
 }
 
 fn pat1() -> Pattern {
-    Pattern(vec![64, 66, 71, 73, 74, 66, 64, 73, 71, 66, 74, 73])
+    Pattern::from_pitches(vec![64, 66, 71, 73, 74, 66, 64, 73, 71, 66, 74, 73])
 }
 
 fn pat2_1() -> Pattern {
-    Pattern(vec![64, 66, 71, 73, 74, 66, 71, 73])
+    Pattern::from_pitches(vec![64, 66, 71, 73, 74, 66, 71, 73])
 }
 
 fn pat2_2() -> Pattern {
-    Pattern(vec![64, 76, 69, 71, 74, 76, 69, 71])
+    Pattern::from_pitches(vec![64, 76, 69, 71, 74, 76, 69, 71])
 }
 
 fn pat2_into_3() -> Pattern {
-    Pattern(vec![64, 76, 69, 71, 74, 76])
+    Pattern::from_pitches(vec![64, 76, 69, 71, 74, 76])
 }
 
 fn pat3() -> Pattern {
-    Pattern(vec![69, 71, 74, 76])
+    Pattern::from_pitches(vec![69, 71, 74, 76])
 }

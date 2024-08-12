@@ -12,7 +12,7 @@ use crate::{
     util::{lerp, remap},
     visualizer::{
         colors::ColorExt,
-        notation::{Font, Staff, StaffPosition},
+        notation::{Font, Staff, StaffPosition, STEM_ABOVE_Y, STEM_BELOW_Y},
     },
 };
 
@@ -28,7 +28,7 @@ impl Visualizer {
         Ok(Visualizer { font: Font::load_bravura().await? })
     }
 
-    pub fn update(&mut self, timing: &Timing, music: &PianoPhase) -> bool {
+    pub fn update(&mut self, timing: &Timing, music: &PianoPhase) {
         clear_background(colors::BACKGROUND_COLOR);
 
         let current_time = timing.current_musical_time(music);
@@ -49,8 +49,6 @@ impl Visualizer {
 
         draw_in_sync_staff(&self.font, music, current_time);
         draw_out_of_sync_staff(&self.font, music, current_time, part1_segment_index, part2_segment_index);
-
-        true
     }
 }
 
@@ -77,7 +75,13 @@ fn draw_status_text(font: &Font, music: &PianoPhase, current_time: f32, part1_se
             y_position,
             font.make_text_params_with_size(FONT_SIZE, colors::FOREGROUND_COLOR),
         );
-        draw_text(&format!(" = {bpm:.1} ({current_measure}/{measures_in_segment})"), LEFT_X + first_part_dims.width + eigth_note_dims.width, y_position, FONT_SIZE as f32, colors::FOREGROUND_COLOR);
+        draw_text(
+            &format!(" = {bpm:.1} ({current_measure}/{measures_in_segment})"),
+            LEFT_X + first_part_dims.width + eigth_note_dims.width,
+            y_position,
+            FONT_SIZE as f32,
+            colors::FOREGROUND_COLOR,
+        );
     };
 
     if let Some(part1_segment_index) = part1_segment_index {
@@ -140,7 +144,7 @@ fn draw_wheel(font: &Font, current_time: f32, segment: &Segment, center_x: f32, 
             (None, None)
         };
 
-        staff.draw_note(note_angle, *note, foreground_color, -3.0, 2, beam_left, beam_right)
+        staff.draw_note(note_angle, note.pitch, foreground_color, STEM_ABOVE_Y, 2, beam_left, beam_right)
     }
 }
 
@@ -194,10 +198,8 @@ fn draw_in_sync_staff(font: &Font, music: &PianoPhase, current_time: f32) {
             let actual_measure = actual_segment.find_measure(note.time.to_f32().unwrap());
             let notes_in_actual_measure = part.find_note_range(|n| n.time < actual_measure.start_time, |n| n.time < actual_measure.end_time);
 
-            let left_beam_time =
-                if note.time != notes_in_actual_measure.first().expect("measure is empty").time { Some(note.time - Ratio::new(1, 2)) } else { None };
-            let right_beam_time =
-                if note.time != notes_in_actual_measure.last().expect("measure is empty").time { Some(note.time + Ratio::new(1, 2)) } else { None };
+            let left_beam_time = if note.time != notes_in_actual_measure[0].time { Some(note.time - Ratio::new(1, 2)) } else { None };
+            let right_beam_time = if note.time != notes_in_actual_measure[notes_in_actual_measure.len() - 1].time { Some(note.time + Ratio::new(1, 2)) } else { None };
 
             let left_beam_x = left_beam_time.map(|t| remap_time_to_x(t.to_f32().unwrap()));
             let right_beam_x = right_beam_time.map(|t| remap_time_to_x(t.to_f32().unwrap()));
@@ -209,8 +211,8 @@ fn draw_in_sync_staff(font: &Font, music: &PianoPhase, current_time: f32) {
     let base_time_segment_index = music.part1.find_segment_for_time(current_time);
     if let Some(base_time_segment_index) = base_time_segment_index {
         let window_length = music.part1.segments[base_time_segment_index].single_measure_duration();
-        draw_past_notes(&top_staff, &music.part1, window_length, -3.0);
-        draw_past_notes(&bottom_staff, &music.part2, window_length, 8.0);
+        draw_past_notes(&top_staff, &music.part1, window_length, STEM_ABOVE_Y);
+        draw_past_notes(&bottom_staff, &music.part2, window_length, STEM_BELOW_Y);
     }
 }
 
@@ -235,7 +237,7 @@ fn draw_out_of_sync_staff(
     let top_staff = Staff::new(font, StaffPosition::Straight { top: STAFF_1_TOP_Y, left: STAFF_LEFT, right: 800.0 }, 10);
     let bottom_staff = Staff::new(font, StaffPosition::Straight { top: STAFF_2_TOP_Y, left: STAFF_LEFT, right: 800.0 }, 10);
 
-    let go = |segment: &Segment, staff: &Staff, staff_top: f32, stem_end_y: f32, hairpin_y: f32| {
+    let go = |segment: &Segment, staff: &Staff, staff_top: f32, hairpin_y: f32| {
         let offset_in_segment =
             (current_time - segment.start_time.to_f32().unwrap()) / (segment.end_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap());
         let current_measure = segment.find_measure(current_time);
@@ -257,17 +259,22 @@ fn draw_out_of_sync_staff(
 
             // only the first and last notes draw beams to simplify things
             // we can't just draw to a fixed offset because that would draw the beam to a certain position which doesn't account for the stem offset
-            let (beam_left, beam_right) = if note_i == 0 {
+            let (beam_left, beam_right) = if note_i == 0 || note_i == 1 {
                 // draw a beam from the first note to the middle of the staff
                 (None, Some(lerp(0.0, last_note_x_position, 0.5)))
-            } else if note_i == segment.pattern.0.len() - 1 {
+            } else if note_i == segment.pattern.0.len() - 1 || note_i == segment.pattern.0.len() - 2 {
                 // draw a beam from the middle of the staff to the last note
                 (Some(lerp(0.0, last_note_x_position, 0.5)), None)
             } else {
                 (None, None)
             };
 
-            staff.draw_note(note_x, *note, foreground_color, stem_end_y, 2, beam_left, beam_right)
+            let stem_end_y = match note.hand {
+                crate::music::Hand::Left => STEM_BELOW_Y,
+                crate::music::Hand::Right => STEM_ABOVE_Y,
+            };
+
+            staff.draw_note(note_x, note.pitch, foreground_color, stem_end_y, 2, beam_left, beam_right)
         }
 
         draw_rectangle(
@@ -286,9 +293,9 @@ fn draw_out_of_sync_staff(
     };
 
     if let Some(part1_segment_index) = part1_segment_index {
-        go(&music.part1.segments[part1_segment_index], &top_staff, STAFF_1_TOP_Y, -3.0, 9.0);
+        go(&music.part1.segments[part1_segment_index], &top_staff, STAFF_1_TOP_Y, 9.0);
     }
     if let Some(part2_segment_index) = part2_segment_index {
-        go(&music.part2.segments[part2_segment_index], &bottom_staff, STAFF_2_TOP_Y, 7.0, 9.0);
+        go(&music.part2.segments[part2_segment_index], &bottom_staff, STAFF_2_TOP_Y, 9.0);
     }
 }

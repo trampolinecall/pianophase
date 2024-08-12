@@ -11,6 +11,9 @@ use smufl::{Coord, Glyph, Metadata, StaffSpaces};
 
 use crate::util::circle_coord;
 
+pub const STEM_ABOVE_Y: f32 = -2.0;
+pub const STEM_BELOW_Y: f32 = 7.0;
+
 #[allow(clippy::manual_non_exhaustive)]
 pub struct Font {
     pub font: macroquad::text::Font,

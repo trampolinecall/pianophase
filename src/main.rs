@@ -20,15 +20,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         timing.update();
-        let r#continue = visualizer.update(&timing, &music);
+        visualizer.update(&timing, &music);
         player.update(&timing, &music);
-
-        if !r#continue {
-            break;
-        }
 
         next_frame().await
     }
-
-    Ok(())
 }
