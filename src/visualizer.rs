@@ -198,7 +198,7 @@ fn draw_out_of_sync_staff(
     let top_staff = Staff::new(font, StaffPosition::Straight { top: STAFF_1_TOP_Y, left: STAFF_LEFT, right: 800.0 }, 10);
     let bottom_staff = Staff::new(font, StaffPosition::Straight { top: STAFF_2_TOP_Y, left: STAFF_LEFT, right: 800.0 }, 10);
 
-    let go = |segment: &Segment, staff: &Staff, staff_top: f32, stem_end_y: f32| {
+    let go = |segment: &Segment, staff: &Staff, staff_top: f32, stem_end_y: f32, hairpin_y: f32| {
         let offset_in_segment =
             (current_time - segment.start_time.to_f32().unwrap()) / (segment.end_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap());
         let current_measure = segment.find_measure(current_time);
@@ -240,12 +240,18 @@ fn draw_out_of_sync_staff(
             staff.staff_height as f32,
             highlight_color,
         );
+
+        match segment.dynamic {
+            crate::music::Dynamic::Crescendo => staff.draw_crescendo(hairpin_y, 0.0, last_note_x_position, colors::FOREGROUND_COLOR),
+            crate::music::Dynamic::Decrescendo => staff.draw_decrescendo(hairpin_y, 0.0, last_note_x_position, colors::FOREGROUND_COLOR),
+            crate::music::Dynamic::Flat | crate::music::Dynamic::Silent => {}
+        }
     };
 
     if let Some(part1_segment_index) = part1_segment_index {
-        go(&music.part1.segments[part1_segment_index], &top_staff, STAFF_1_TOP_Y, -3.0);
+        go(&music.part1.segments[part1_segment_index], &top_staff, STAFF_1_TOP_Y, -3.0, 9.0);
     }
     if let Some(part2_segment_index) = part2_segment_index {
-        go(&music.part2.segments[part2_segment_index], &bottom_staff, STAFF_2_TOP_Y, 8.0);
+        go(&music.part2.segments[part2_segment_index], &bottom_staff, STAFF_2_TOP_Y, 7.0, 9.0);
     }
 }

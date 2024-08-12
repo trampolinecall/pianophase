@@ -7,7 +7,7 @@ use macroquad::{
     text::{draw_text_ex, TextParams},
 };
 use num_traits::FloatConst;
-use smufl::{Coord, Metadata, StaffSpaces};
+use smufl::{Coord, Glyph, Metadata, StaffSpaces};
 
 use crate::util::circle_coord;
 
@@ -107,7 +107,7 @@ impl<'font> Staff<'font> {
             _ => unimplemented!("{} not implemented", pitch),
         };
         let notehead_origin =
-            optional_coord_to_tuple(self.font.metadata.anchors.get(smufl::Glyph::NoteheadBlack).and_then(|anchors| anchors.notehead_origin));
+            optional_coord_to_tuple(self.font.metadata.anchors.get(Glyph::NoteheadBlack).and_then(|anchors| anchors.notehead_origin));
         let stem_thickness =
             self.font.metadata.engraving_defaults.stem_thickness.unwrap_or(StaffSpaces(3.0 / 25.0)).0 as f32 * self.staff_space as f32;
 
@@ -117,7 +117,7 @@ impl<'font> Staff<'font> {
                 self.calculate_position(x_coord_on_staff - notehead_origin.x, y_coord_on_staff - notehead_origin.y);
 
             draw_text_ex(
-                &smufl::Glyph::NoteheadBlack.codepoint().to_string(),
+                &Glyph::NoteheadBlack.codepoint().to_string(),
                 notehead_drawn_position.x,
                 notehead_drawn_position.y,
                 TextParams { rotation, ..self.font.make_text_params(self, color) },
@@ -140,8 +140,8 @@ impl<'font> Staff<'font> {
             draw_text_ex(
                 &match accidental {
                     Accidental::Natural => unreachable!(),
-                    Accidental::Sharp => smufl::Glyph::AccidentalSharp,
-                    Accidental::Flat => smufl::Glyph::AccidentalFlat,
+                    Accidental::Sharp => Glyph::AccidentalSharp,
+                    Accidental::Flat => Glyph::AccidentalFlat,
                 }
                 .codepoint()
                 .to_string(),
@@ -154,9 +154,9 @@ impl<'font> Staff<'font> {
         // drawing the stem
         let stem_up = stem_end_y < y_coord_on_staff;
         let stem_origin = if stem_up {
-            optional_coord_to_tuple(self.font.metadata.anchors.get(smufl::Glyph::NoteheadBlack).and_then(|anchors| anchors.stem_up_se))
+            optional_coord_to_tuple(self.font.metadata.anchors.get(Glyph::NoteheadBlack).and_then(|anchors| anchors.stem_up_se))
         } else {
-            optional_coord_to_tuple(self.font.metadata.anchors.get(smufl::Glyph::NoteheadBlack).and_then(|anchors| anchors.stem_down_nw))
+            optional_coord_to_tuple(self.font.metadata.anchors.get(Glyph::NoteheadBlack).and_then(|anchors| anchors.stem_down_nw))
         };
         let stem_x = match self.position {
             StaffPosition::Straight { top: _, left: _, right: _ } => x_coord_on_staff + stem_origin.x,
@@ -225,6 +225,66 @@ impl<'font> Staff<'font> {
                     current_y += dy;
                 }
             }
+        }
+    }
+
+    pub fn draw_crescendo(&self, y: f32, left: f32, right: f32, color: Color) {
+        self.draw_hairpin(y, left, right, color, false, true);
+    }
+
+    pub fn draw_decrescendo(&self, y: f32, left: f32, right: f32, color: Color) {
+        self.draw_hairpin(y, left, right, color, true, false);
+    }
+
+    // using bool for true = 1, false = 0
+    fn draw_hairpin(&self, y: f32, left: f32, right: f32, color: Color, left_dynamic: bool, right_dynamic: bool) {
+        #![allow(clippy::bool_comparison)]
+        let hairpin_thickness =
+            self.font.metadata.engraving_defaults.hairpin_thickness.unwrap_or(StaffSpaces(0.16)).0 as f32 * self.staff_space as f32;
+
+        let height_left = if left_dynamic == false { 0.0 } else { 1.0 };
+        let height_right = if right_dynamic == false { 0.0 } else { 1.0 };
+
+        {
+            let (top_line_left, _) = self.calculate_position(left, y - height_left / 2.0);
+            let (top_line_right, _) = self.calculate_position(right, y - height_right / 2.0);
+
+            draw_line(top_line_left.x, top_line_left.y, top_line_right.x, top_line_right.y, hairpin_thickness, color);
+        }
+        {
+            let (bottom_line_left, _) = self.calculate_position(left, y + height_left / 2.0);
+            let (bottom_line_right, _) = self.calculate_position(right, y + height_right / 2.0);
+
+            draw_line(bottom_line_left.x, bottom_line_left.y, bottom_line_right.x, bottom_line_right.y, hairpin_thickness, color);
+        }
+
+        if left_dynamic == false {
+            let n_advance_width = self.font.metadata.advance_widths.get(Glyph::DynamicNiente).unwrap_or(StaffSpaces(1.0)).0 as f32;
+            let (position, rotation) = self.calculate_position(left - 1.0 - n_advance_width, y + 0.5);
+            draw_text_ex(
+                &Glyph::DynamicNiente.codepoint().to_string(),
+                position.x,
+                position.y,
+                TextParams { rotation, ..self.font.make_text_params(self, color) },
+            );
+        }
+        if right_dynamic == false {
+            let (position, rotation) = self.calculate_position(right + 1.0, y + 0.5);
+            draw_text_ex(
+                &Glyph::DynamicNiente.codepoint().to_string(),
+                position.x,
+                position.y,
+                TextParams { rotation, ..self.font.make_text_params(self, color) },
+            );
+        }
+        if right_dynamic == true {
+            let (position, rotation) = self.calculate_position(right + 1.0, y + 0.5);
+            draw_text_ex(
+                &Glyph::DynamicMf.codepoint().to_string(),
+                position.x,
+                position.y,
+                TextParams { rotation, ..self.font.make_text_params(self, color) },
+            );
         }
     }
 }
