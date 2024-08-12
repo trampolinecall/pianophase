@@ -9,7 +9,7 @@ use macroquad::{
 use num_traits::FloatConst;
 use smufl::{Coord, Metadata, StaffSpaces};
 
-use crate::{util::circle_coord, visualizer::colors};
+use crate::util::circle_coord;
 
 #[allow(clippy::manual_non_exhaustive)]
 pub struct Font {
@@ -62,25 +62,19 @@ impl<'font> Staff<'font> {
         }
     }
 
-    pub fn draw(&self) {
+    pub fn draw(&self, color: Color) {
         let line_thickness =
             self.font.metadata.engraving_defaults.staff_line_thickness.unwrap_or(StaffSpaces(1.0 / 8.0)).0 as f32 * self.staff_space as f32;
         match self.position {
             StaffPosition::Straight { top, left, right } => {
                 for i in 0..5 {
                     let y = top + i as f32 * self.staff_space as f32;
-                    draw_line(left, y, right, y, line_thickness, colors::FOREGROUND_COLOR);
+                    draw_line(left, y, right, y, line_thickness, color);
                 }
             }
             StaffPosition::Circular { center_x, center_y, outer_radius } => {
                 for i in 0..5 {
-                    draw_circle_lines(
-                        center_x,
-                        center_y,
-                        outer_radius - i as f32 * self.staff_space as f32,
-                        line_thickness,
-                        colors::FOREGROUND_COLOR,
-                    );
+                    draw_circle_lines(center_x, center_y, outer_radius - i as f32 * self.staff_space as f32, line_thickness, color);
                 }
             }
         }

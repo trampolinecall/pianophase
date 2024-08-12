@@ -35,33 +35,13 @@ impl Visualizer {
         let part1_segment_index = music.part1.find_segment_for_time(current_time);
         let part2_segment_index = music.part2.find_segment_for_time(current_time);
 
-        const SPINNER_LENGTH: f32 = 100.0;
-        const ARC_RADIUS: f32 = 150.0;
-        const STAFF_RADIUS: f32 = 250.0;
+        const STAFF_RADIUS: f32 = 200.0;
         // TODO: adjust to window size
         if let Some(part1_segment_index) = part1_segment_index {
-            draw_wheel(
-                &self.font,
-                current_time,
-                &music.part1.segments[part1_segment_index],
-                1280.0 * 0.25,
-                720.0 / 2.0,
-                SPINNER_LENGTH,
-                ARC_RADIUS,
-                STAFF_RADIUS,
-            );
+            draw_wheel(&self.font, current_time, &music.part1.segments[part1_segment_index], 1280.0 * 0.25, 720.0 / 2.0, STAFF_RADIUS);
         }
         if let Some(part2_segment_index) = part2_segment_index {
-            draw_wheel(
-                &self.font,
-                current_time,
-                &music.part2.segments[part2_segment_index],
-                1280.0 * 0.75,
-                720.0 / 2.0,
-                SPINNER_LENGTH,
-                ARC_RADIUS,
-                STAFF_RADIUS,
-            );
+            draw_wheel(&self.font, current_time, &music.part2.segments[part2_segment_index], 1280.0 * 0.75, 720.0 / 2.0, STAFF_RADIUS);
         }
 
         draw_in_sync_staff(&self.font, music, current_time);
@@ -70,16 +50,13 @@ impl Visualizer {
     }
 }
 
-fn draw_wheel(
-    font: &Font,
-    current_time: f32,
-    segment: &Segment,
-    center_x: f32,
-    center_y: f32,
-    spinner_radius: f32,
-    arc_radius: f32,
-    staff_outer_radius: f32,
-) {
+fn draw_wheel(font: &Font, current_time: f32, segment: &Segment, center_x: f32, center_y: f32, staff_outer_radius: f32) {
+    let staff = Staff::new(font, StaffPosition::Circular { center_x, center_y, outer_radius: staff_outer_radius }, 10);
+    staff.draw(colors::FOREGROUND_COLOR);
+
+    let dot_radius = staff_outer_radius - staff.staff_height as f32 - 20.0;
+    let spinner_radius = staff_outer_radius - staff.staff_height as f32 - 40.0;
+
     let offset_in_segment =
         (current_time - segment.start_time.to_f32().unwrap()) / (segment.end_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap());
     let current_measure = segment.find_measure(current_time);
@@ -88,20 +65,28 @@ fn draw_wheel(
 
     let current_dynamic = segment.dynamic.interpolate(offset_in_segment);
 
-    let color = colors::FOREGROUND_COLOR.set_a(current_dynamic);
+    let foreground_color = colors::FOREGROUND_COLOR.modify_a(|a| a * current_dynamic);
+    let highlight_color = colors::HIGHLIGHT_COLOR.modify_a(|a| a * current_dynamic);
 
     let spinner_end_x = center_x + (offset_in_measure * f32::TAU() - f32::PI() / 2.0).cos() * spinner_radius;
     let spinner_end_y = center_y + (offset_in_measure * f32::TAU() - f32::PI() / 2.0).sin() * spinner_radius;
-    draw_line(center_x, center_y, spinner_end_x, spinner_end_y, 10.0, color);
+    draw_line(center_x, center_y, spinner_end_x, spinner_end_y, 10.0, foreground_color);
 
-    let dot_x = center_x + (offset_in_measure_rounded * f32::TAU() - f32::PI() / 2.0).cos() * ((spinner_radius + arc_radius) / 2.0);
-    let dot_y = center_y + (offset_in_measure_rounded * f32::TAU() - f32::PI() / 2.0).sin() * ((spinner_radius + arc_radius) / 2.0);
-    draw_circle(dot_x, dot_y, 7.0, color);
+    let dot_x = center_x + (offset_in_measure_rounded * f32::TAU() - f32::PI() / 2.0).cos() * dot_radius;
+    let dot_y = center_y + (offset_in_measure_rounded * f32::TAU() - f32::PI() / 2.0).sin() * dot_radius;
+    draw_circle(dot_x, dot_y, 7.0, foreground_color);
 
-    draw_arc(center_x, center_y, 56, arc_radius, -90.0, 10.0, 360.0 * offset_in_measure, color);
+    draw_arc(
+        center_x,
+        center_y,
+        56,
+        staff_outer_radius - staff.staff_height as f32,
+        -90.0,
+        staff.staff_height as f32,
+        360.0 * offset_in_measure,
+        highlight_color,
+    );
 
-    let staff = Staff::new(font, StaffPosition::Circular { center_x, center_y, outer_radius: staff_outer_radius }, 10);
-    staff.draw();
     for (note_i, note) in segment.pattern.0.iter().enumerate() {
         let note_angle = remap(note_i as f32, 0.0, segment.pattern.0.len() as f32, 0.0, f32::TAU());
 
@@ -117,7 +102,7 @@ fn draw_wheel(
             (None, None)
         };
 
-        staff.draw_note(note_angle, *note, colors::FOREGROUND_COLOR, -3.0, 2, beam_left, beam_right)
+        staff.draw_note(note_angle, *note, foreground_color, -3.0, 2, beam_left, beam_right)
     }
 }
 
@@ -133,11 +118,11 @@ fn draw_in_sync_staff(font: &Font, music: &PianoPhase, current_time: f32) {
     // this is measured in staff spaces now
     const NOTE_HORIZ_SPACE: f32 = 5.0;
 
-    top_staff.draw();
-    bottom_staff.draw();
+    top_staff.draw(colors::FOREGROUND_COLOR);
+    bottom_staff.draw(colors::FOREGROUND_COLOR);
 
     // notes
-    let draw_past_notes = |staff: &Staff, part: &Part, window_duration: Rational32, staff_top_y: f32, stem_end_y: f32, subsequent_beams_up: bool| {
+    let draw_past_notes = |staff: &Staff, part: &Part, window_duration: Rational32, stem_end_y: f32| {
         let notes = part.find_note_range(
             |note| note.time.to_f32().unwrap() < (current_time - window_duration.to_f32().unwrap()),
             |note| note.time.to_f32().unwrap() <= current_time,
@@ -187,7 +172,7 @@ fn draw_in_sync_staff(font: &Font, music: &PianoPhase, current_time: f32) {
     let base_time_segment_index = music.part1.find_segment_for_time(current_time);
     if let Some(base_time_segment_index) = base_time_segment_index {
         let window_length = music.part1.segments[base_time_segment_index].single_measure_duration();
-        draw_past_notes(&top_staff, &music.part1, window_length, STAFF_1_TOP_Y, -3.0, false);
-        draw_past_notes(&bottom_staff, &music.part2, window_length, STAFF_2_TOP_Y, 8.0, true);
+        draw_past_notes(&top_staff, &music.part1, window_length, -3.0);
+        draw_past_notes(&bottom_staff, &music.part2, window_length, 8.0);
     }
 }
