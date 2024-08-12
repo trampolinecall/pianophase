@@ -217,12 +217,12 @@ fn parts(shorten: bool) -> (Part, Part) {
     (part_1_alone(&mut parts, pat1(), 8));
     (part_2_fade_in(&mut parts, pat1(), pat1(), 12));
 
-    // for _ in 0..11 {
-    //     (part_2_phase(&mut parts, pat1(), pat1(), 8));
-    //     (parts_repeat(&mut parts, pat1(), pat1(), 18));
-    // }
-    // (part_2_phase(&mut parts, pat1(), pat1(), 8));
-    // (part_2_catch_up(&mut parts, pat1(), pat1()));
+    for _ in 0..11 {
+        (part_2_phase(&mut parts, pat1(), pat1(), 8));
+        (parts_repeat(&mut parts, pat1(), pat1(), 18));
+    }
+    (part_2_phase(&mut parts, pat1(), pat1(), 8));
+    (part_2_catch_up(&mut parts, pat1(), pat1()));
     (part_2_fade_out(&mut parts, pat1(), pat1(), 8));
 
     (part_1_alone(&mut parts, pat1(), 6));
