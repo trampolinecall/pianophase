@@ -8,7 +8,7 @@ use rustysynth::{SoundFont, Synthesizer, SynthesizerSettings};
 use tinyaudio::{run_output_device, BaseAudioOutputDevice, OutputDeviceParameters};
 
 use crate::{
-    music::{FlattenedNote, Part, PianoPhase},
+    music::{Part, PianoPhase},
     timing::Timing,
 };
 

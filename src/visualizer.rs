@@ -25,9 +25,9 @@ impl Visualizer {
     }
 
     pub fn update(&mut self, timing: &Timing, music: &PianoPhase) -> bool {
-        let current_time = timing.current_musical_time(music);
-
         clear_background(color::BLACK);
+
+        let current_time = timing.current_musical_time(music);
 
         let part1_segment_index = music.part1.find_current_segment(current_time);
         let part2_segment_index = music.part2.find_current_segment(current_time);
@@ -70,7 +70,13 @@ impl Visualizer {
             const STAFF_SPACE: u32 = 10;
             const STAFF_HEIGHT: u32 = STAFF_SPACE * 4;
 
+            // TODO: eventually calculate these instead of hardcoding them
+            const STAFF_LEFT: f32 = 200.0;
+            const STAFF_RIGHT: f32 = 800.0;
+            const STAFF_TOP_Y: f32 = 600.0;
+
             const NOTE_HORIZ_SPACE: f32 = 50.0;
+            const ACCIDENTAL_SHIFT: f32 = 0.3;
 
             let staff_line_thickness =
                 self.font.metadata.engraving_defaults.staff_line_thickness.unwrap_or(StaffSpaces(1.0 / 8.0)).0 as f32 * STAFF_SPACE as f32;
@@ -80,10 +86,10 @@ impl Visualizer {
             // staff lines
             for i in 0..5 {
                 draw_line(
-                    200.0,
-                    600.0 + i as f32 * STAFF_SPACE as f32,
-                    800.0,
-                    600.0 + i as f32 * STAFF_SPACE as f32,
+                    STAFF_LEFT,
+                    STAFF_TOP_Y + i as f32 * STAFF_SPACE as f32,
+                    STAFF_RIGHT,
+                    STAFF_TOP_Y + i as f32 * STAFF_SPACE as f32,
                     staff_line_thickness,
                     color::WHITE,
                 );
@@ -106,136 +112,109 @@ impl Visualizer {
                 _ => unimplemented!("{} not implemented", note),
             };
 
+            // TODO: make a helper module to deal with these
             let smufl_coord_to_tuple = |coord: Coord| (coord.x().0 as f32 * STAFF_SPACE as f32, -coord.y().0 as f32 * STAFF_SPACE as f32);
 
-            // notes
-            if let Some(part1_segment_index) = part1_segment_index {
-                for (i, note) in music.part1.0[part1_segment_index].0.pattern.0.iter().enumerate() {
-                    let notehead_x = 200.0 + i as f32 * NOTE_HORIZ_SPACE;
-                    let notehead_origin = self
-                        .font
-                        .metadata
-                        .anchors
-                        .get(smufl::Glyph::NoteheadBlack)
-                        .and_then(|anchors| anchors.notehead_origin)
-                        .map(smufl_coord_to_tuple)
-                        .unwrap_or((0.0, 0.0));
-                    let (y_position, accidental) = pitch_to_y_position(*note);
+            let draw_note = |x_position: f32, pitch, stem_up, color| {
+                let (y_position, accidental) = pitch_to_y_position(pitch);
+                let notehead_origin = self
+                    .font
+                    .metadata
+                    .anchors
+                    .get(smufl::Glyph::NoteheadBlack)
+                    .and_then(|anchors| anchors.notehead_origin)
+                    .map(smufl_coord_to_tuple)
+                    .unwrap_or((0.0, 0.0));
+
+                draw_text_ex(
+                    &smufl::Glyph::NoteheadBlack.codepoint().to_string(),
+                    x_position - notehead_origin.0,
+                    STAFF_TOP_Y + y_position * STAFF_SPACE as f32 - notehead_origin.1,
+                    TextParams {
+                        font: Some(&self.font.font),
+                        font_size: STAFF_HEIGHT as u16,
+                        font_scale: 1.0,
+                        font_scale_aspect: 1.0,
+                        rotation: 0.0,
+                        color,
+                    },
+                );
+
+                if let Accidental::Sharp | Accidental::Flat = accidental {
                     draw_text_ex(
-                        &smufl::Glyph::NoteheadBlack.codepoint().to_string(),
-                        notehead_x - notehead_origin.0,
-                        600.0 + y_position * STAFF_SPACE as f32 - notehead_origin.1,
+                        &match accidental {
+                            Accidental::Natural => unreachable!(),
+                            Accidental::Sharp => smufl::Glyph::AccidentalSharp,
+                            Accidental::Flat => smufl::Glyph::AccidentalFlat,
+                        }
+                        .codepoint()
+                        .to_string(),
+                        x_position - NOTE_HORIZ_SPACE * ACCIDENTAL_SHIFT,
+                        STAFF_TOP_Y + y_position * STAFF_SPACE as f32,
                         TextParams {
                             font: Some(&self.font.font),
                             font_size: STAFF_HEIGHT as u16,
                             font_scale: 1.0,
                             font_scale_aspect: 1.0,
                             rotation: 0.0,
-                            color: color::WHITE,
+                            color,
                         },
                     );
-                    if let Accidental::Sharp | Accidental::Flat = accidental {
-                        draw_text_ex(
-                            &match accidental {
-                                Accidental::Natural => unreachable!(),
-                                Accidental::Sharp => smufl::Glyph::AccidentalSharp,
-                                Accidental::Flat => smufl::Glyph::AccidentalFlat,
-                            }
-                            .codepoint()
-                            .to_string(),
-                            notehead_x - NOTE_HORIZ_SPACE * 0.3,
-                            600.0 + y_position * STAFF_SPACE as f32,
-                            TextParams {
-                                font: Some(&self.font.font),
-                                font_size: STAFF_HEIGHT as u16,
-                                font_scale: 1.0,
-                                font_scale_aspect: 1.0,
-                                rotation: 0.0,
-                                color: color::WHITE,
-                            },
-                        );
-                    }
-                    let stem_origin = self
-                        .font
+                }
+
+                let stem_origin = if stem_up {
+                    self.font
                         .metadata
                         .anchors
                         .get(smufl::Glyph::NoteheadBlack)
                         .and_then(|anchors| anchors.stem_up_se)
                         .map(smufl_coord_to_tuple)
-                        .unwrap_or((0.0, 0.0));
-                    draw_line(
-                        notehead_x + stem_origin.0,
-                        600.0 + y_position * STAFF_SPACE as f32 + stem_origin.1,
-                        notehead_x + stem_origin.0,
-                        600.0 - 3.0 * STAFF_SPACE as f32,
-                        stem_thickness,
-                        color::WHITE,
-                    );
-                }
-            }
-
-            if let Some(part2_segment_index) = part2_segment_index {
-                for (i, note) in music.part2.0[part2_segment_index].0.pattern.0.iter().enumerate() {
-                    let notehead_x = 200.0 + i as f32 * NOTE_HORIZ_SPACE;
-                    let notehead_origin = self
-                        .font
-                        .metadata
-                        .anchors
-                        .get(smufl::Glyph::NoteheadBlack)
-                        .and_then(|anchors| anchors.notehead_origin)
-                        .map(smufl_coord_to_tuple)
-                        .unwrap_or((0.0, 0.0));
-                    let (y_position, accidental) = pitch_to_y_position(*note);
-                    draw_text_ex(
-                        &smufl::Glyph::NoteheadBlack.codepoint().to_string(),
-                        notehead_x - notehead_origin.0,
-                        600.0 + y_position * STAFF_SPACE as f32 - notehead_origin.1,
-                        TextParams {
-                            font: Some(&self.font.font),
-                            font_size: STAFF_HEIGHT as u16,
-                            font_scale: 1.0,
-                            font_scale_aspect: 1.0,
-                            rotation: 0.0,
-                            color: color::WHITE,
-                        },
-                    );
-                    if let Accidental::Sharp | Accidental::Flat = accidental {
-                        draw_text_ex(
-                            &match accidental {
-                                Accidental::Natural => unreachable!(),
-                                Accidental::Sharp => smufl::Glyph::AccidentalSharp,
-                                Accidental::Flat => smufl::Glyph::AccidentalFlat,
-                            }
-                            .codepoint()
-                            .to_string(),
-                            notehead_x - NOTE_HORIZ_SPACE * 0.3,
-                            600.0 + y_position * STAFF_SPACE as f32,
-                            TextParams {
-                                font: Some(&self.font.font),
-                                font_size: STAFF_HEIGHT as u16,
-                                font_scale: 1.0,
-                                font_scale_aspect: 1.0,
-                                rotation: 0.0,
-                                color: color::WHITE,
-                            },
-                        );
-                    }
-                    let stem_origin = self
-                        .font
+                        .unwrap_or((0.0, 0.0))
+                } else {
+                    self.font
                         .metadata
                         .anchors
                         .get(smufl::Glyph::NoteheadBlack)
                         .and_then(|anchors| anchors.stem_down_nw)
                         .map(smufl_coord_to_tuple)
-                        .unwrap_or((0.0, 0.0));
-                    draw_line(
-                        notehead_x + stem_origin.0,
-                        600.0 + y_position * STAFF_SPACE as f32 + stem_origin.1,
-                        notehead_x + stem_origin.0,
-                        600.0 + STAFF_HEIGHT as f32 + 3.0 * STAFF_SPACE as f32,
-                        stem_thickness,
-                        color::WHITE,
-                    );
+                        .unwrap_or((0.0, 0.0))
+                };
+
+                let stem_end_y =
+                    if stem_up { STAFF_TOP_Y - 3.0 * STAFF_SPACE as f32 } else { STAFF_TOP_Y + STAFF_HEIGHT as f32 + 3.0 * STAFF_SPACE as f32 };
+
+                draw_line(
+                    x_position - notehead_origin.0 + stem_origin.0,
+                    STAFF_TOP_Y + y_position * STAFF_SPACE as f32 - notehead_origin.1 + stem_origin.1,
+                    x_position - notehead_origin.0 + stem_origin.0,
+                    stem_end_y,
+                    stem_thickness,
+                    color,
+                );
+            };
+
+            // notes
+            if let Some(part1_segment_index) = part1_segment_index {
+                let (segment, segment_start, segment_end) = &music.part1.0[part1_segment_index];
+                let current_dynamic = segment.dynamic.interpolate(
+                    (current_time.to_f32().unwrap() - segment_start.to_f32().unwrap())
+                        / (segment_end.to_f32().unwrap() - segment_start.to_f32().unwrap()),
+                );
+                for (i, note) in segment.pattern.0.iter().enumerate() {
+                    let notehead_x = STAFF_LEFT + i as f32 * NOTE_HORIZ_SPACE;
+                    draw_note(notehead_x, *note, true, Color::from_rgba(255, 255, 255, (255.0 * current_dynamic) as u8));
+                }
+            }
+
+            if let Some(part2_segment_index) = part2_segment_index {
+                let (segment, segment_start, segment_end) = &music.part2.0[part2_segment_index];
+                let current_dynamic = segment.dynamic.interpolate(
+                    (current_time.to_f32().unwrap() - segment_start.to_f32().unwrap())
+                        / (segment_end.to_f32().unwrap() - segment_start.to_f32().unwrap()),
+                );
+                for (i, note) in segment.pattern.0.iter().enumerate() {
+                    let notehead_x = STAFF_LEFT + i as f32 * NOTE_HORIZ_SPACE;
+                    draw_note(notehead_x, *note, false, Color::from_rgba(255, 255, 255, (255.0 * current_dynamic) as u8));
                 }
             }
         }
