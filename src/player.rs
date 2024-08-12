@@ -9,7 +9,7 @@ use tinyaudio::{run_output_device, BaseAudioOutputDevice, OutputDeviceParameters
 
 use crate::{
     music::{Part, PianoPhase},
-    timing::Timing,
+    timing::Timing, util::remap,
 };
 
 pub struct Player {
@@ -59,7 +59,7 @@ impl Player {
                     synth.note_off(channel, note.pitch as i32);
                 }
                 for note in notes_pressed {
-                    synth.note_on(channel, note.pitch as i32, note.velocity);
+                    synth.note_on(channel, note.pitch as i32, remap(note.volume, 0.0, 1.0, 0.0, 127.0) as i32);
                 }
             }
         };

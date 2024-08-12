@@ -34,12 +34,12 @@ impl Visualizer {
 
         let draw_wheel = |center_x: f32, center_y: f32, part: &Part, segment_index: Option<usize>| {
             let Some(segment_index) = segment_index else { return };
-            let (segment, segment_start, segment_end) = &part.0[segment_index];
+            let segment = &part.segments[segment_index];
 
-            let offset_in_segment = (current_time.to_f32().unwrap() - segment_start.to_f32().unwrap())
-                / (segment_end.to_f32().unwrap() - segment_start.to_f32().unwrap());
+            let offset_in_segment = (current_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap())
+                / (segment.end_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap());
             let offset_in_pattern =
-                ((current_time.to_f32().unwrap() - segment_start.to_f32().unwrap()) / segment.single_pattern_duration().to_f32().unwrap()).fract();
+                ((current_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap()) / segment.single_pattern_duration().to_f32().unwrap()).fract();
             let offset_in_pattern_rounded = (offset_in_pattern * segment.pattern.0.len() as f32).floor() / segment.pattern.0.len() as f32;
 
             let current_dynamic = segment.dynamic.interpolate(offset_in_segment);
@@ -195,10 +195,10 @@ impl Visualizer {
 
             // notes
             if let Some(part1_segment_index) = part1_segment_index {
-                let (segment, segment_start, segment_end) = &music.part1.0[part1_segment_index];
+                let segment = &music.part1.segments[part1_segment_index];
                 let current_dynamic = segment.dynamic.interpolate(
-                    (current_time.to_f32().unwrap() - segment_start.to_f32().unwrap())
-                        / (segment_end.to_f32().unwrap() - segment_start.to_f32().unwrap()),
+                    (current_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap())
+                        / (segment.end_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap()),
                 );
                 for (i, note) in segment.pattern.0.iter().enumerate() {
                     let notehead_x = STAFF_LEFT + i as f32 * NOTE_HORIZ_SPACE;
@@ -207,10 +207,10 @@ impl Visualizer {
             }
 
             if let Some(part2_segment_index) = part2_segment_index {
-                let (segment, segment_start, segment_end) = &music.part2.0[part2_segment_index];
+                let segment = &music.part2.segments[part2_segment_index];
                 let current_dynamic = segment.dynamic.interpolate(
-                    (current_time.to_f32().unwrap() - segment_start.to_f32().unwrap())
-                        / (segment_end.to_f32().unwrap() - segment_start.to_f32().unwrap()),
+                    (current_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap())
+                        / (segment.end_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap()),
                 );
                 for (i, note) in segment.pattern.0.iter().enumerate() {
                     let notehead_x = STAFF_LEFT + i as f32 * NOTE_HORIZ_SPACE;

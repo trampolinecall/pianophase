@@ -4,6 +4,7 @@ mod music;
 mod player;
 mod timing;
 mod visualizer;
+mod util;
 
 fn window_conf() -> Conf {
     Conf { window_title: "Piano Phase".to_string(), window_width: 1280, window_height: 720, sample_count: 4, ..Default::default() }
