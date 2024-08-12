@@ -57,11 +57,7 @@ fn draw_status_text(font: &Font, music: &PianoPhase, current_time: f32, part1_se
     const LEFT_X: f32 = 0.0;
 
     let go = |segment: &Segment, part_name: &'static str, y_position: f32| {
-        let status = match segment.speed.cmp(&Ratio::ONE) {
-            std::cmp::Ordering::Less => "Slowing down...",
-            std::cmp::Ordering::Equal => "Steady",
-            std::cmp::Ordering::Greater => "Speeding up...",
-        };
+        let status = if segment.speed != Ratio::ONE { "Phasing..." } else { "Steady" };
 
         let bpm = music.tempo as f32 / 2.0 * segment.speed.to_f32().unwrap();
 
@@ -96,8 +92,8 @@ fn draw_wheel(font: &Font, current_time: f32, segment: &Segment, center_x: f32, 
     let staff = Staff::new(font, StaffPosition::Circular { center_x, center_y, outer_radius: staff_outer_radius }, 10);
     staff.draw(colors::FOREGROUND_COLOR);
 
-    let dot_radius = staff_outer_radius - staff.staff_height as f32 - 20.0;
-    let spinner_radius = staff_outer_radius - staff.staff_height as f32 - 40.0;
+    let dot_radius = staff_outer_radius - STEM_BELOW_Y * staff.staff_space as f32 - 20.0;
+    let spinner_radius = staff_outer_radius - STEM_BELOW_Y * staff.staff_space as f32 - 40.0;
 
     let offset_in_segment =
         (current_time - segment.start_time.to_f32().unwrap()) / (segment.end_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap());
@@ -134,17 +130,22 @@ fn draw_wheel(font: &Font, current_time: f32, segment: &Segment, center_x: f32, 
 
         // only the first and last notes draw beams to simplify things
         // we can't just draw to a fixed offset because that would draw the beam to a certain angle which doesn't account for the stem offset
-        let (beam_left, beam_right) = if note_i == 0 {
+        let (beam_left, beam_right) = if note_i == 0 || note_i == 1 {
             // draw a beam from the first note to the bottom of the staff
             (None, Some(f32::PI()))
-        } else if note_i == segment.pattern.0.len() - 1 {
+        } else if note_i == segment.pattern.0.len() - 1 || note_i == segment.pattern.0.len() - 2 {
             // draw a beam from the bottom of the staff to the last note
             (Some(f32::PI()), None)
         } else {
             (None, None)
         };
 
-        staff.draw_note(note_angle, note.pitch, foreground_color, STEM_ABOVE_Y, 2, beam_left, beam_right)
+        let stem_end_y = match note.hand {
+            crate::music::Hand::Left => STEM_BELOW_Y,
+            crate::music::Hand::Right => STEM_ABOVE_Y,
+        };
+
+        staff.draw_note(note_angle, note.pitch, foreground_color, stem_end_y, 2, beam_left, beam_right)
     }
 }
 
@@ -199,7 +200,8 @@ fn draw_in_sync_staff(font: &Font, music: &PianoPhase, current_time: f32) {
             let notes_in_actual_measure = part.find_note_range(|n| n.time < actual_measure.start_time, |n| n.time < actual_measure.end_time);
 
             let left_beam_time = if note.time != notes_in_actual_measure[0].time { Some(note.time - Ratio::new(1, 2)) } else { None };
-            let right_beam_time = if note.time != notes_in_actual_measure[notes_in_actual_measure.len() - 1].time { Some(note.time + Ratio::new(1, 2)) } else { None };
+            let right_beam_time =
+                if note.time != notes_in_actual_measure[notes_in_actual_measure.len() - 1].time { Some(note.time + Ratio::new(1, 2)) } else { None };
 
             let left_beam_x = left_beam_time.map(|t| remap_time_to_x(t.to_f32().unwrap()));
             let right_beam_x = right_beam_time.map(|t| remap_time_to_x(t.to_f32().unwrap()));
