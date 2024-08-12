@@ -91,6 +91,16 @@ impl Segment {
     pub fn single_pattern_duration(&self) -> Rational32 {
         Ratio::from_integer(self.pattern.0.len() as i32) / self.speed
     }
+    pub fn offset_in_pattern(&self, time: f32) -> f32 {
+        ((time - self.start_time.to_f32().unwrap()) / self.single_pattern_duration().to_f32().unwrap()).fract()
+    }
+    pub fn pattern_bounds(&self, time: f32) -> (f32, f32) {
+        let start = ((time - self.start_time.to_f32().unwrap()) / self.single_pattern_duration().to_f32().unwrap()).floor()
+            * self.single_pattern_duration().to_f32().unwrap()
+            + self.start_time.to_f32().unwrap();
+        let end = start + self.single_pattern_duration().to_f32().unwrap();
+        (start, end)
+    }
 }
 
 impl Dynamic {

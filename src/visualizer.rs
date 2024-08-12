@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use macroquad::{
     color::{self, Color},
     shapes::{draw_arc, draw_circle, draw_line},
@@ -11,7 +13,7 @@ use smufl::StaffSpaces;
 use crate::{
     music::{Part, PianoPhase, Segment},
     timing::Timing,
-    util::remap,
+    util::{lerp, remap},
     visualizer::notation::{Font, StaffParams},
 };
 
@@ -53,8 +55,7 @@ impl Visualizer {
 fn draw_wheel(current_time: f32, segment: &Segment, center_x: f32, center_y: f32, spinner_radius: f32, arc_radius: f32) {
     let offset_in_segment = (current_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap())
         / (segment.end_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap());
-    let offset_in_pattern =
-        ((current_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap()) / segment.single_pattern_duration().to_f32().unwrap()).fract();
+    let offset_in_pattern = segment.offset_in_pattern(current_time);
     let offset_in_pattern_rounded = (offset_in_pattern * segment.pattern.0.len() as f32).floor() / segment.pattern.0.len() as f32;
 
     let current_dynamic = segment.dynamic.interpolate(offset_in_segment);
@@ -85,22 +86,68 @@ fn draw_in_sync_staff(music: &PianoPhase, current_time: f32, font: &Font) {
     draw_staff(font, &STAFF_PARAMS, STAFF_LEFT, STAFF_RIGHT, STAFF_TOP_Y);
 
     // notes
-    let draw_past_notes = |part: &Part, window_duration: Rational32, stem_end_y: f32| {
+    let draw_past_notes = |part: &Part, window_duration: Rational32, stem_end_y: f32, subsequent_beams_up: bool| {
         let notes = part.find_note_range(
             |note| note.time.to_f32().unwrap() < (current_time - window_duration.to_f32().unwrap()),
             |note| note.time.to_f32().unwrap() <= current_time.to_f32().unwrap(),
         );
 
         for note in notes {
-            let note_segment = &music.part1.segments[music.part1.find_segment_for_time(note.time.to_f32().unwrap()).unwrap()];
-            let note_x = remap(
-                note.time.to_f32().unwrap(),
-                note_segment.start_time.to_f32().unwrap(),
-                note_segment.end_time.to_f32().unwrap(),
-                STAFF_LEFT,
-                STAFF_LEFT + note_segment.single_pattern_duration().to_f32().unwrap() * NOTE_HORIZ_SPACE,
-            );
-            draw_note(font, &STAFF_PARAMS, STAFF_TOP_Y, note_x, note.pitch, stem_end_y, Color::from_rgba(255, 255, 255, (255.0 * note.volume) as u8));
+            {
+                // TODO: clean up this code
+                let base_speed_segment = &music.part1.segments[music.part1.find_segment_for_time(note.time.to_f32().unwrap()).unwrap()];
+                let base_speed_pattern_bounds = base_speed_segment.pattern_bounds(note.time.to_f32().unwrap());
+                let note_x = remap(
+                    note.time.to_f32().unwrap(),
+                    base_speed_pattern_bounds.0,
+                    base_speed_pattern_bounds.1,
+                    STAFF_LEFT,
+                    STAFF_LEFT + base_speed_segment.single_pattern_duration().to_f32().unwrap() * NOTE_HORIZ_SPACE,
+                );
+
+                draw_note(
+                    font,
+                    &STAFF_PARAMS,
+                    STAFF_TOP_Y,
+                    note_x,
+                    note.pitch,
+                    stem_end_y,
+                    Color::from_rgba(255, 255, 255, (255.0 * note.volume) as u8),
+                );
+
+                let part_segment_index = part.find_segment_for_time(note.time.to_f32().unwrap());
+                if let Some(part_segment_index) = part_segment_index {
+                    let part_segment = &part.segments[part_segment_index];
+                    let part_pattern_bounds = part_segment.pattern_bounds(note.time.to_f32().unwrap());
+
+                    // TODO: shift beam to the right for stems up
+                    let beam_start_x = remap(
+                        part_pattern_bounds.0,
+                        base_speed_pattern_bounds.0,
+                        base_speed_pattern_bounds.1,
+                        STAFF_LEFT,
+                        STAFF_LEFT + base_speed_segment.single_pattern_duration().to_f32().unwrap() * NOTE_HORIZ_SPACE,
+                    );
+                    let beam_end_x = remap(
+                        part_pattern_bounds.1 - 1.0,
+                        base_speed_pattern_bounds.0,
+                        base_speed_pattern_bounds.1,
+                        STAFF_LEFT,
+                        STAFF_LEFT + base_speed_segment.single_pattern_duration().to_f32().unwrap() * NOTE_HORIZ_SPACE,
+                    );
+
+                    draw_beam(
+                        font,
+                        &STAFF_PARAMS,
+                        beam_start_x,
+                        beam_end_x,
+                        2,
+                        stem_end_y,
+                        subsequent_beams_up,
+                        Color::from_rgba(255, 255, 255, (255.0 * note.volume) as u8),
+                    );
+                }
+            }
         }
     };
 
@@ -108,8 +155,25 @@ fn draw_in_sync_staff(music: &PianoPhase, current_time: f32, font: &Font) {
     if let Some(part1_segment_index) = part1_segment_index {
         let part1_segment_length = music.part1.segments[part1_segment_index].single_pattern_duration();
 
-        draw_past_notes(&music.part1, part1_segment_length, STAFF_TOP_Y - 3.0 * STAFF_PARAMS.staff_space as f32);
-        draw_past_notes(&music.part2, part1_segment_length, STAFF_TOP_Y + STAFF_PARAMS.staff_height as f32 + 3.0 * STAFF_PARAMS.staff_space as f32);
+        draw_past_notes(&music.part1, part1_segment_length, STAFF_TOP_Y - 3.0 * STAFF_PARAMS.staff_space as f32, false);
+        draw_past_notes(
+            &music.part2,
+            part1_segment_length,
+            STAFF_TOP_Y + STAFF_PARAMS.staff_height as f32 + 3.0 * STAFF_PARAMS.staff_space as f32,
+            true,
+        );
+    }
+}
+
+fn draw_beam(font: &Font, staff_params: &StaffParams, start_x: f32, end_x: f32, num_beams: u16, y: f32, subsequent_beams_up: bool, color: Color) {
+    let beam_thickness = font.metadata.engraving_defaults.beam_thickness.unwrap_or(StaffSpaces(0.5)).0 as f32 * staff_params.staff_space as f32;
+    let beam_spacing = font.metadata.engraving_defaults.beam_spacing.unwrap_or(StaffSpaces(0.25)).0 as f32 * staff_params.staff_space as f32;
+
+    let dy = (beam_thickness + beam_spacing) * if subsequent_beams_up { -1.0 } else { 1.0 };
+    let mut current_y = y;
+    for _ in 0..num_beams {
+        draw_line(start_x, current_y, end_x, current_y, beam_thickness, color);
+        current_y += dy;
     }
 }
 
