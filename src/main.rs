@@ -1,4 +1,9 @@
-use macroquad::prelude::{next_frame, Conf};
+use std::time::Duration;
+
+use macroquad::{
+    input::{is_key_pressed, KeyCode},
+    prelude::{next_frame, Conf},
+};
 
 mod music;
 mod player;
@@ -19,6 +24,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut visualizer = visualizer::Visualizer::new().await?;
 
     loop {
+        if is_key_pressed(KeyCode::Right) {
+            timing.seek_forward(Duration::from_secs(5));
+        }
+        if is_key_pressed(KeyCode::Left) {
+            timing.seek_backwards(Duration::from_secs(5));
+        }
+        if is_key_pressed(KeyCode::Space) {
+            timing.toggle_stopped();
+        }
+
         timing.update();
         visualizer.update(&timing, &music);
         player.update(&timing, &music);
