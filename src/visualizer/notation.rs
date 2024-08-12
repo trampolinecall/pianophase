@@ -200,7 +200,16 @@ impl<'font> Staff<'font> {
                             );
                         }
                         StaffPosition::Circular { center_x, center_y, outer_radius } => {
-                            draw_arc(center_x, center_y, 8, outer_radius - current_y, beam_left, beam_right - beam_left, beam_thickness * self.staff_space as f32, color);
+                            draw_arc(
+                                center_x,
+                                center_y,
+                                8,
+                                outer_radius - current_y,
+                                beam_left,
+                                beam_right - beam_left,
+                                beam_thickness * self.staff_space as f32,
+                                color,
+                            );
                         }
                     }
 
