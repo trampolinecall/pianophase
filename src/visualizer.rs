@@ -9,7 +9,7 @@ use num_traits::{FloatConst, ToPrimitive};
 use smufl::StaffSpaces;
 
 use crate::{
-    music::{PianoPhase, Segment},
+    music::{Part, PianoPhase, Segment},
     timing::Timing,
     util::remap,
     visualizer::notation::{Font, StaffParams},
@@ -31,8 +31,8 @@ impl Visualizer {
 
         let current_time = timing.current_musical_time(music);
 
-        let part1_segment_index = music.part1.find_current_segment(current_time);
-        let part2_segment_index = music.part2.find_current_segment(current_time);
+        let part1_segment_index = music.part1.find_segment_for_time(current_time);
+        let part2_segment_index = music.part2.find_segment_for_time(current_time);
 
         const SPINNER_LENGTH: f32 = 100.0;
         const ARC_RADIUS: f32 = 150.0;
@@ -44,13 +44,13 @@ impl Visualizer {
             draw_wheel(current_time, &music.part2.segments[part2_segment_index], 1280.0 * 0.75, 720.0 / 2.0, SPINNER_LENGTH, ARC_RADIUS);
         }
 
-        draw_in_sync_staff(music, current_time, &self.font, part1_segment_index, part2_segment_index);
+        draw_in_sync_staff(music, current_time, &self.font);
 
         true
     }
 }
 
-fn draw_wheel(current_time: Rational32, segment: &Segment, center_x: f32, center_y: f32, spinner_radius: f32, arc_radius: f32) {
+fn draw_wheel(current_time: f32, segment: &Segment, center_x: f32, center_y: f32, spinner_radius: f32, arc_radius: f32) {
     let offset_in_segment = (current_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap())
         / (segment.end_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap());
     let offset_in_pattern =
@@ -72,13 +72,7 @@ fn draw_wheel(current_time: Rational32, segment: &Segment, center_x: f32, center
     draw_arc(center_x, center_y, 56, arc_radius, -90.0, 10.0, 360.0 * offset_in_pattern, color);
 }
 
-fn draw_in_sync_staff(
-    music: &PianoPhase,
-    current_time: Rational32,
-    font: &Font,
-    part1_segment_index: Option<usize>,
-    part2_segment_index: Option<usize>,
-) {
+fn draw_in_sync_staff(music: &PianoPhase, current_time: f32, font: &Font) {
     const STAFF_PARAMS: StaffParams = StaffParams::new(10);
     // TODO: eventually calculate these instead of hardcoding them
     const STAFF_LEFT: f32 = 200.0;
@@ -91,36 +85,33 @@ fn draw_in_sync_staff(
     draw_staff(font, &STAFF_PARAMS, STAFF_LEFT, STAFF_RIGHT, STAFF_TOP_Y);
 
     // notes
-    let draw_notes = |segment: &Segment, stem_end_y: f32| {
-        let current_dynamic = segment.dynamic.interpolate(remap(
-            current_time.to_f32().unwrap(),
-            segment.start_time.to_f32().unwrap(),
-            segment.end_time.to_f32().unwrap(),
-            0.0,
-            1.0,
-        ));
+    let draw_past_notes = |part: &Part, window_duration: Rational32, stem_end_y: f32| {
+        let notes = part.find_note_range(
+            |note| note.time.to_f32().unwrap() < (current_time - window_duration.to_f32().unwrap()),
+            |note| note.time.to_f32().unwrap() <= current_time.to_f32().unwrap(),
+        );
 
-        for (note_index, note_pitch) in segment.pattern.0.iter().enumerate() {
-            let note_x = STAFF_LEFT + note_index as f32 * NOTE_HORIZ_SPACE;
-            draw_note(
-                font,
-                &STAFF_PARAMS,
-                STAFF_TOP_Y,
-                note_x,
-                *note_pitch,
-                stem_end_y,
-                Color::from_rgba(255, 255, 255, (255.0 * current_dynamic) as u8),
+        println!("{:?}", window_duration);
+
+        for note in notes {
+            let note_segment = &music.part1.segments[music.part1.find_segment_for_time(note.time.to_f32().unwrap()).unwrap()];
+            let note_x = remap(
+                note.time.to_f32().unwrap(),
+                note_segment.start_time.to_f32().unwrap(),
+                note_segment.end_time.to_f32().unwrap(),
+                STAFF_LEFT,
+                STAFF_LEFT + note_segment.single_pattern_duration().to_f32().unwrap() * NOTE_HORIZ_SPACE,
             );
+            draw_note(font, &STAFF_PARAMS, STAFF_TOP_Y, note_x, note.pitch, stem_end_y, Color::from_rgba(255, 255, 255, (255.0 * note.volume) as u8));
         }
     };
-    if let Some(part1_segment_index) = part1_segment_index {
-        let segment = &music.part1.segments[part1_segment_index];
-        draw_notes(segment, STAFF_TOP_Y - 3.0 * STAFF_PARAMS.staff_space as f32);
-    }
 
-    if let Some(part2_segment_index) = part2_segment_index {
-        let segment = &music.part2.segments[part2_segment_index];
-        draw_notes(segment, STAFF_TOP_Y + STAFF_PARAMS.staff_height as f32 + 3.0 * STAFF_PARAMS.staff_space as f32);
+    let part1_segment_index = music.part1.find_segment_for_time(current_time);
+    if let Some(part1_segment_index) = part1_segment_index {
+        let part1_segment_length = music.part1.segments[part1_segment_index].single_pattern_duration();
+
+        draw_past_notes(&music.part1, part1_segment_length, STAFF_TOP_Y - 3.0 * STAFF_PARAMS.staff_space as f32);
+        draw_past_notes(&music.part2, part1_segment_length, STAFF_TOP_Y + STAFF_PARAMS.staff_height as f32 + 3.0 * STAFF_PARAMS.staff_space as f32);
     }
 }
 

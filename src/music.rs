@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 
 use num_rational::{Ratio, Rational32};
+use num_traits::ToPrimitive;
 
 use crate::util::lerp;
 
@@ -36,6 +37,7 @@ pub enum Dynamic {
     Silent,
 }
 
+#[derive(Debug)]
 pub struct FlattenedNote {
     pub pitch: u8,
     pub time: Rational32,
@@ -56,17 +58,20 @@ impl PianoPhase {
     }
 }
 impl Part {
-    pub fn find_current_segment(&self, time: Rational32) -> Option<usize> {
-        let result = self.segments.binary_search_by(|segment| match (segment.start_time.cmp(&time), segment.end_time.cmp(&time)) {
-            (Ordering::Less, Ordering::Less) => Ordering::Less,
-            (Ordering::Less, Ordering::Equal) => Ordering::Less,
-            (Ordering::Less, Ordering::Greater) => Ordering::Equal,
-            (Ordering::Equal, Ordering::Less) => panic!("segment starts later than it ends"),
-            (Ordering::Equal, Ordering::Equal) => Ordering::Equal,
-            (Ordering::Equal, Ordering::Greater) => Ordering::Equal,
-            (Ordering::Greater, Ordering::Less) => panic!("segment starts later than it ends"),
-            (Ordering::Greater, Ordering::Equal) => panic!("segment starts later than it ends"),
-            (Ordering::Greater, Ordering::Greater) => Ordering::Greater,
+    pub fn find_segment_for_time(&self, time: f32) -> Option<usize> {
+        let result = self.segments.binary_search_by(|segment| {
+            match (segment.start_time.to_f32().unwrap().partial_cmp(&time), segment.end_time.to_f32().unwrap().partial_cmp(&time)) {
+                (Some(Ordering::Less), Some(Ordering::Less)) => Ordering::Less,
+                (Some(Ordering::Less), Some(Ordering::Equal)) => Ordering::Less,
+                (Some(Ordering::Less), Some(Ordering::Greater)) => Ordering::Equal,
+                (Some(Ordering::Equal), Some(Ordering::Less)) => panic!("segment starts later than it ends"),
+                (Some(Ordering::Equal), Some(Ordering::Equal)) => Ordering::Equal,
+                (Some(Ordering::Equal), Some(Ordering::Greater)) => Ordering::Equal,
+                (Some(Ordering::Greater), Some(Ordering::Less)) => panic!("segment starts later than it ends"),
+                (Some(Ordering::Greater), Some(Ordering::Equal)) => panic!("segment starts later than it ends"),
+                (Some(Ordering::Greater), Some(Ordering::Greater)) => Ordering::Greater,
+                _ => panic!("comparison resulted in None in find_segment_for_time"),
+            }
         });
         match result {
             Ok(index) => Some(index),
@@ -83,7 +88,7 @@ impl Part {
 }
 
 impl Segment {
-    pub(crate) fn single_pattern_duration(&self) -> Rational32 {
+    pub fn single_pattern_duration(&self) -> Rational32 {
         Ratio::from_integer(self.pattern.0.len() as i32) / self.speed
     }
 }
@@ -212,12 +217,12 @@ fn parts(shorten: bool) -> (Part, Part) {
     (part_1_alone(&mut parts, pat1(), 8));
     (part_2_fade_in(&mut parts, pat1(), pat1(), 12));
 
-    for _ in 0..11 {
-        (part_2_phase(&mut parts, pat1(), pat1(), 8));
-        (parts_repeat(&mut parts, pat1(), pat1(), 18));
-    }
-    (part_2_phase(&mut parts, pat1(), pat1(), 8));
-    (part_2_catch_up(&mut parts, pat1(), pat1()));
+    // for _ in 0..11 {
+    //     (part_2_phase(&mut parts, pat1(), pat1(), 8));
+    //     (parts_repeat(&mut parts, pat1(), pat1(), 18));
+    // }
+    // (part_2_phase(&mut parts, pat1(), pat1(), 8));
+    // (part_2_catch_up(&mut parts, pat1(), pat1()));
     (part_2_fade_out(&mut parts, pat1(), pat1(), 8));
 
     (part_1_alone(&mut parts, pat1(), 6));

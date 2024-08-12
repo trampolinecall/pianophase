@@ -4,12 +4,14 @@ use std::{
 };
 
 use itertools::Itertools;
+use num_traits::ToPrimitive;
 use rustysynth::{SoundFont, Synthesizer, SynthesizerSettings};
 use tinyaudio::{run_output_device, BaseAudioOutputDevice, OutputDeviceParameters};
 
 use crate::{
     music::{Part, PianoPhase},
-    timing::Timing, util::remap,
+    timing::Timing,
+    util::remap,
 };
 
 pub struct Player {
@@ -50,8 +52,9 @@ impl Player {
         let this_time = timing.current_musical_time(music);
 
         let update_part = |part: &Part, channel: i32| {
-            let notes_released = part.find_note_range(|n| n.time + n.length < last_time, |n| n.time + n.length < this_time);
-            let notes_pressed = part.find_note_range(|n| n.time < last_time, |n| n.time < this_time);
+            let notes_released =
+                part.find_note_range(|n| (n.time + n.length).to_f32().unwrap() < last_time, |n| (n.time + n.length).to_f32().unwrap() < this_time);
+            let notes_pressed = part.find_note_range(|n| n.time.to_f32().unwrap() < last_time, |n| n.time.to_f32().unwrap() < this_time);
 
             {
                 let mut synth = self.synthesizer.lock().unwrap();

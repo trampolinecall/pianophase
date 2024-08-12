@@ -1,8 +1,5 @@
 use std::time::{Duration, Instant};
 
-use num_rational::{Ratio, Rational32};
-use num_traits::FromPrimitive;
-
 use crate::music::PianoPhase;
 
 pub struct Timing {
@@ -35,14 +32,14 @@ impl Timing {
     pub fn last_time(&self) -> Duration {
         self.last_time
     }
-    pub fn last_musical_time(&self, music: &PianoPhase) -> Rational32 {
-        Ratio::from_f64(music.tempo as f64 * self.last_time.as_secs_f64() / 60.0).unwrap()
+    pub fn last_musical_time(&self, music: &PianoPhase) -> f32 {
+        music.tempo as f32 * self.last_time.as_secs_f32() / 60.0
     }
 
     pub fn current_time(&self) -> Duration {
         self.time
     }
-    pub fn current_musical_time(&self, music: &PianoPhase) -> Rational32 {
-        Ratio::from_f64(music.tempo as f64 * self.time.as_secs_f64() / 60.0).unwrap()
+    pub fn current_musical_time(&self, music: &PianoPhase) -> f32 {
+        music.tempo as f32 * self.time.as_secs_f32() / 60.0
     }
 }
