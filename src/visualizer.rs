@@ -1,5 +1,6 @@
 use macroquad::{
     shapes::{draw_arc, draw_circle, draw_line, draw_rectangle},
+    text::{draw_text, draw_text_ex},
     window::clear_background,
 };
 use num_rational::{Ratio, Rational32};
@@ -35,6 +36,8 @@ impl Visualizer {
         let part1_segment_index = music.part1.find_segment_for_time(current_time);
         let part2_segment_index = music.part2.find_segment_for_time(current_time);
 
+        draw_status_text(&self.font, music, current_time, part1_segment_index, part2_segment_index);
+
         const STAFF_RADIUS: f32 = 200.0;
         // TODO: adjust to window size
         if let Some(part1_segment_index) = part1_segment_index {
@@ -48,6 +51,40 @@ impl Visualizer {
         draw_out_of_sync_staff(&self.font, music, current_time, part1_segment_index, part2_segment_index);
 
         true
+    }
+}
+
+fn draw_status_text(font: &Font, music: &PianoPhase, current_time: f32, part1_segment_index: Option<usize>, part2_segment_index: Option<usize>) {
+    const FONT_SIZE: u16 = 24;
+    const LEFT_X: f32 = 0.0;
+
+    let go = |segment: &Segment, part_name: &'static str, y_position: f32| {
+        let status = match segment.speed.cmp(&Ratio::ONE) {
+            std::cmp::Ordering::Less => "Slowing down...",
+            std::cmp::Ordering::Equal => "Steady",
+            std::cmp::Ordering::Greater => "Speeding up...",
+        };
+
+        let bpm = music.tempo as f32 / 2.0 * segment.speed.to_f32().unwrap();
+
+        let current_measure = segment.find_measure(current_time).number + 1;
+        let measures_in_segment = segment.repetitions;
+
+        let first_part_dims = draw_text(&format!("{part_name}: {status} "), LEFT_X, y_position, FONT_SIZE as f32, colors::FOREGROUND_COLOR);
+        let eigth_note_dims = draw_text_ex(
+            &smufl::Glyph::MetNote8thUp.codepoint().to_string(),
+            LEFT_X + first_part_dims.width,
+            y_position,
+            font.make_text_params_with_size(FONT_SIZE, colors::FOREGROUND_COLOR),
+        );
+        draw_text(&format!(" = {bpm:.1} ({current_measure}/{measures_in_segment})"), LEFT_X + first_part_dims.width + eigth_note_dims.width, y_position, FONT_SIZE as f32, colors::FOREGROUND_COLOR);
+    };
+
+    if let Some(part1_segment_index) = part1_segment_index {
+        go(&music.part1.segments[part1_segment_index], "Piano 1", 24.0);
+    }
+    if let Some(part2_segment_index) = part2_segment_index {
+        go(&music.part2.segments[part2_segment_index], "Piano 2", 48.0);
     }
 }
 

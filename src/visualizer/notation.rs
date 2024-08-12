@@ -43,6 +43,9 @@ impl Font {
     pub fn make_text_params(&self, staff: &Staff, color: Color) -> TextParams {
         TextParams { font: Some(&self.font), font_size: staff.staff_height, font_scale: 1.0, font_scale_aspect: 1.0, rotation: 0.0, color }
     }
+    pub fn make_text_params_with_size(&self, font_size: u16, color: Color) -> TextParams {
+        TextParams { font: Some(&self.font), font_size, font_scale: 1.0, font_scale_aspect: 1.0, rotation: 0.0, color }
+    }
 }
 
 impl<'font> Staff<'font> {

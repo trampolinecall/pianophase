@@ -90,17 +90,18 @@ impl Part {
 pub struct Measure {
     pub start_time: Rational32,
     pub end_time: Rational32,
+    pub number: usize,
 }
 impl Segment {
     pub fn single_measure_duration(&self) -> Rational32 {
         Ratio::from_integer(self.pattern.0.len() as i32) / self.speed
     }
     pub fn find_measure(&self, time: f32) -> Measure {
-        let repetition_number = ((time - self.start_time.to_f32().unwrap()) / self.single_measure_duration().to_f32().unwrap()).floor() as i32;
-        let start_time = Ratio::from_integer(repetition_number) * self.single_measure_duration() + self.start_time;
+        let repetition_number = ((time - self.start_time.to_f32().unwrap()) / self.single_measure_duration().to_f32().unwrap()).floor() as usize;
+        let start_time = Ratio::from_integer(repetition_number as i32) * self.single_measure_duration() + self.start_time;
         let end_time = start_time + self.single_measure_duration();
 
-        Measure { start_time, end_time }
+        Measure { start_time, end_time, number: repetition_number }
     }
 }
 
@@ -220,9 +221,8 @@ fn parts(shorten: bool) -> (Part, Part) {
         add_part_2(parts, part2_pattern, speed_multiplier, repetitions, Dynamic::Flat);
     };
 
-    let part_2_catch_up = |parts: &mut (PartBuilder, PartBuilder), part1_pattern: Pattern, part2_pattern: Pattern| {
-        add_part_1(parts, part1_pattern, Ratio::ONE, 1, Dynamic::Flat);
-        add_part_2(parts, part2_pattern, Ratio::ONE, 2, Dynamic::Flat);
+    let part_2_catch_up = |parts: &mut (PartBuilder, PartBuilder), _: Pattern, part2_pattern: Pattern| {
+        add_part_2(parts, part2_pattern, Ratio::ONE, 1, Dynamic::Flat);
     };
 
     (part_1_alone(&mut parts, pat1(), 8));
