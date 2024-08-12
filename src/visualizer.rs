@@ -89,7 +89,7 @@ fn draw_status_text(font: &Font, music: &PianoPhase, current_time: f32, part1_se
 }
 
 fn draw_wheel(font: &Font, current_time: f32, segment: &Segment, center_x: f32, center_y: f32, staff_outer_radius: f32) {
-    let staff = Staff::new(font, StaffPosition::Circular { center_x, center_y, outer_radius: staff_outer_radius }, 10);
+    let staff = Staff::new(font, StaffPosition::Circular { center_x, center_y, outer_radius: staff_outer_radius }, 6);
     staff.draw(colors::FOREGROUND_COLOR);
 
     let dot_radius = staff_outer_radius - STEM_BELOW_Y * staff.staff_space as f32 - 20.0;
@@ -154,15 +154,12 @@ fn draw_in_sync_staff(font: &Font, music: &PianoPhase, current_time: f32) {
     const STAFF_1_TOP_Y: f32 = 600.0;
     const STAFF_2_TOP_Y: f32 = 700.0;
     // TODO: calculate these positions instead of hardcoding them
-    let top_staff = Staff::new(font, StaffPosition::Straight { top: STAFF_1_TOP_Y, left: STAFF_LEFT, right: 800.0 }, 10);
-    let bottom_staff = Staff::new(font, StaffPosition::Straight { top: STAFF_2_TOP_Y, left: STAFF_LEFT, right: 800.0 }, 10);
+    let top_staff = Staff::new(font, StaffPosition::Straight { top: STAFF_1_TOP_Y, left: STAFF_LEFT, right: 800.0 }, 6);
+    let bottom_staff = Staff::new(font, StaffPosition::Straight { top: STAFF_2_TOP_Y, left: STAFF_LEFT, right: 800.0 }, 6);
 
     // TODO: also calculate this
     // this is measured in staff spaces now
     const NOTE_HORIZ_SPACE: f32 = 5.0;
-
-    top_staff.draw(colors::FOREGROUND_COLOR);
-    bottom_staff.draw(colors::FOREGROUND_COLOR);
 
     let draw_past_notes = |staff: &Staff, part: &Part, window_duration: Rational32, stem_end_y: f32| {
         let notes = part.find_note_range(
@@ -212,6 +209,8 @@ fn draw_in_sync_staff(font: &Font, music: &PianoPhase, current_time: f32) {
 
     let base_time_segment_index = music.part1.find_segment_for_time(current_time);
     if let Some(base_time_segment_index) = base_time_segment_index {
+        top_staff.draw(colors::FOREGROUND_COLOR);
+        bottom_staff.draw(colors::FOREGROUND_COLOR);
         let window_length = music.part1.segments[base_time_segment_index].single_measure_duration();
         draw_past_notes(&top_staff, &music.part1, window_length, STEM_ABOVE_Y);
         draw_past_notes(&bottom_staff, &music.part2, window_length, STEM_BELOW_Y);
@@ -236,8 +235,8 @@ fn draw_out_of_sync_staff(
     const NOTE_HORIZ_SPACE: f32 = 5.0;
 
     // TODO: calculate these positions instead of hardcoding them
-    let top_staff = Staff::new(font, StaffPosition::Straight { top: STAFF_1_TOP_Y, left: STAFF_LEFT, right: 800.0 }, 10);
-    let bottom_staff = Staff::new(font, StaffPosition::Straight { top: STAFF_2_TOP_Y, left: STAFF_LEFT, right: 800.0 }, 10);
+    let top_staff = Staff::new(font, StaffPosition::Straight { top: STAFF_1_TOP_Y, left: STAFF_LEFT, right: 800.0 }, 6);
+    let bottom_staff = Staff::new(font, StaffPosition::Straight { top: STAFF_2_TOP_Y, left: STAFF_LEFT, right: 800.0 }, 6);
 
     let go = |segment: &Segment, staff: &Staff, staff_top: f32, hairpin_y: f32| {
         let offset_in_segment =
