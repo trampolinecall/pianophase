@@ -12,7 +12,7 @@ use crate::{
     timing::Timing,
     util::{lerp, remap},
     visualizer::{
-        colors::ColorExt,
+        colors::ChangeAlpha,
         notation::{Staff, StaffPosition, CLEF_OFFSET, CLEF_WIDTH, DYNAMICS_Y, REPEAT_WIDTH, STEM_ABOVE_Y, STEM_BELOW_Y},
     },
 };
@@ -236,12 +236,12 @@ fn draw_in_sync_staff(font: &notation::Font, music: &PianoPhase, window: Rect, c
                 let note_fade = clamp(
                     remap(
                         note.time.to_f32().unwrap(),
-                        current_time - window_duration.to_f32().unwrap() * 0.8,
-                        current_time - window_duration.to_f32().unwrap() * 0.5,
-                        0.25,
+                        current_time - window_duration.to_f32().unwrap() * 0.75,
+                        current_time - window_duration.to_f32().unwrap() * 0.25,
+                        0.3,
                         1.0,
                     ),
-                    0.25,
+                    0.3,
                     1.0,
                 );
 
