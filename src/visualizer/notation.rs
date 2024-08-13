@@ -318,11 +318,21 @@ impl<'font> Staff<'font> {
         if ending {
             dots_x = x;
             thin_line_x = x + dots_advance_width + repeat_barline_dot_separation + thin_barline_thickness * 0.5;
-            thick_line_x = x + dots_advance_width + repeat_barline_dot_separation + thin_barline_thickness + thin_thick_barline_separation + thick_barline_thickness * 0.5;
+            thick_line_x = x
+                + dots_advance_width
+                + repeat_barline_dot_separation
+                + thin_barline_thickness
+                + thin_thick_barline_separation
+                + thick_barline_thickness * 0.5;
         } else {
             dots_x = x - dots_advance_width;
             thin_line_x = x - dots_advance_width - repeat_barline_dot_separation - thin_barline_thickness * 0.5;
-            thick_line_x = x - dots_advance_width - repeat_barline_dot_separation - thin_barline_thickness - thin_thick_barline_separation - thick_barline_thickness * 0.5;
+            thick_line_x = x
+                - dots_advance_width
+                - repeat_barline_dot_separation
+                - thin_barline_thickness
+                - thin_thick_barline_separation
+                - thick_barline_thickness * 0.5;
         }
 
         let (Vec2 { x: thin_line_x, y: thin_line_top_y }, _) = self.calculate_position(thin_line_x, 0.0);
@@ -339,6 +349,16 @@ impl<'font> Staff<'font> {
             dots_x,
             dots_y,
             TextParams { rotation: dots_rotation, ..self.font.make_text_params(self, color) },
+        );
+    }
+
+    pub fn draw_treble_clef(&self, x: f32, color: Color) {
+        let (position, rotation) = self.calculate_position(x, 3.0);
+        draw_text_ex(
+            &Glyph::GClef.codepoint().to_string(),
+            position.x,
+            position.y,
+            TextParams { rotation, ..self.font.make_text_params(self, color) },
         );
     }
 }

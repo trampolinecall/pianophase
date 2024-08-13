@@ -1,4 +1,5 @@
 use macroquad::{
+    math::clamp,
     shapes::{draw_arc, draw_circle, draw_line, draw_rectangle},
     text::{draw_text, draw_text_ex},
     window::clear_background,
@@ -151,15 +152,13 @@ fn draw_wheel(font: &Font, current_time: f32, segment: &Segment, center_x: f32, 
 
 fn draw_in_sync_staff(font: &Font, music: &PianoPhase, current_time: f32) {
     const STAFF_LEFT: f32 = 200.0;
-    const STAFF_1_TOP_Y: f32 = 600.0;
-    const STAFF_2_TOP_Y: f32 = 700.0;
+    const STAFF_TOP_Y: f32 = 600.0;
     // TODO: calculate these positions instead of hardcoding them
-    let top_staff = Staff::new(font, StaffPosition::Straight { top: STAFF_1_TOP_Y, left: STAFF_LEFT, right: 800.0 }, 6);
-    let bottom_staff = Staff::new(font, StaffPosition::Straight { top: STAFF_2_TOP_Y, left: STAFF_LEFT, right: 800.0 }, 6);
+    let staff = Staff::new(font, StaffPosition::Straight { top: STAFF_TOP_Y, left: STAFF_LEFT, right: 800.0 }, 6);
 
     // TODO: also calculate this
     // this is measured in staff spaces now
-    const NOTE_HORIZ_SPACE: f32 = 5.0;
+    const NOTE_HORIZ_SPACE: f32 = 10.0;
 
     let draw_past_notes = |staff: &Staff, part: &Part, window_duration: Rational32, stem_end_y: f32| {
         let notes = part.find_note_range(
@@ -167,6 +166,8 @@ fn draw_in_sync_staff(font: &Font, music: &PianoPhase, current_time: f32) {
             |note| note.time.to_f32().unwrap() <= current_time,
         );
 
+        staff.draw_treble_clef(0.0, colors::FOREGROUND_COLOR);
+        let notes_left = 10.0;
         for note in notes {
             // TODO: clean up this code
             let base_speed_segment = &music.part1.segments[music.part1.find_segment_for_time(note.time.to_f32().unwrap()).unwrap()];
@@ -177,17 +178,21 @@ fn draw_in_sync_staff(font: &Font, music: &PianoPhase, current_time: f32) {
                     time,
                     base_speed_measure.start_time.to_f32().unwrap(),
                     base_speed_measure.end_time.to_f32().unwrap(),
-                    0.0,
-                    base_speed_segment.single_measure_duration().to_f32().unwrap() * NOTE_HORIZ_SPACE,
+                    notes_left,
+                    base_speed_segment.single_measure_duration().to_f32().unwrap() * NOTE_HORIZ_SPACE + notes_left,
                 )
             };
 
             let note_x = remap_time_to_x(note.time.to_f32().unwrap());
 
-            let note_fade = remap(
-                note.time.to_f32().unwrap(),
-                current_time - window_duration.to_f32().unwrap() * 0.8,
-                current_time - window_duration.to_f32().unwrap() * 0.5,
+            let note_fade = clamp(
+                remap(
+                    note.time.to_f32().unwrap(),
+                    current_time - window_duration.to_f32().unwrap() * 0.8,
+                    current_time - window_duration.to_f32().unwrap() * 0.5,
+                    0.0,
+                    1.0,
+                ),
                 0.0,
                 1.0,
             );
@@ -209,11 +214,10 @@ fn draw_in_sync_staff(font: &Font, music: &PianoPhase, current_time: f32) {
 
     let base_time_segment_index = music.part1.find_segment_for_time(current_time);
     if let Some(base_time_segment_index) = base_time_segment_index {
-        top_staff.draw(colors::FOREGROUND_COLOR);
-        bottom_staff.draw(colors::FOREGROUND_COLOR);
+        staff.draw(colors::FOREGROUND_COLOR);
         let window_length = music.part1.segments[base_time_segment_index].single_measure_duration();
-        draw_past_notes(&top_staff, &music.part1, window_length, STEM_ABOVE_Y);
-        draw_past_notes(&top_staff, &music.part2, window_length, STEM_BELOW_Y);
+        draw_past_notes(&staff, &music.part1, window_length, STEM_ABOVE_Y);
+        draw_past_notes(&staff, &music.part2, window_length, STEM_BELOW_Y);
     }
 }
 
@@ -254,8 +258,14 @@ fn draw_out_of_sync_staff(
 
         staff.draw(colors::FOREGROUND_COLOR);
 
-        let notes_start_x = 2.0;
+        staff.draw_treble_clef(0.0, colors::FOREGROUND_COLOR);
+
+        let notes_start_x = 10.0;
         let last_note_x_position = notes_start_x + pattern_len as f32 * NOTE_HORIZ_SPACE;
+
+        staff.draw_starting_repeat_sign(notes_start_x - 0.5, colors::FOREGROUND_COLOR);
+        staff.draw_ending_repeat_sign(last_note_x_position + 0.5, colors::FOREGROUND_COLOR);
+
         for (note_i, note) in segment.pattern.0.iter().enumerate() {
             let note_x = remap(note_i as f32, 0.0, pattern_len as f32, notes_start_x, last_note_x_position);
 
@@ -279,20 +289,17 @@ fn draw_out_of_sync_staff(
             staff.draw_note(note_x, note.pitch, foreground_color, stem_end_y, 2, beam_left, beam_right)
         }
 
-        staff.draw_starting_repeat_sign(notes_start_x - 0.5, foreground_color);
-        staff.draw_ending_repeat_sign(last_note_x_position + 0.5, foreground_color);
-
         draw_rectangle(
-            STAFF_LEFT,
+            STAFF_LEFT + notes_start_x * staff.staff_space as f32,
             staff_top,
-            lerp(0.0, last_note_x_position, offset_in_measure) * staff.staff_space as f32,
+            lerp(0.0, last_note_x_position - notes_start_x, offset_in_measure) * staff.staff_space as f32,
             staff.staff_height as f32,
             highlight_color,
         );
 
         match segment.dynamic {
-            crate::music::Dynamic::Crescendo => staff.draw_crescendo(hairpin_y, 0.0, last_note_x_position, colors::FOREGROUND_COLOR),
-            crate::music::Dynamic::Decrescendo => staff.draw_decrescendo(hairpin_y, 0.0, last_note_x_position, colors::FOREGROUND_COLOR),
+            crate::music::Dynamic::Crescendo => staff.draw_crescendo(hairpin_y, notes_start_x, last_note_x_position, colors::FOREGROUND_COLOR),
+            crate::music::Dynamic::Decrescendo => staff.draw_decrescendo(hairpin_y, notes_start_x, last_note_x_position, colors::FOREGROUND_COLOR),
             crate::music::Dynamic::Flat | crate::music::Dynamic::Silent => {}
         }
     };
