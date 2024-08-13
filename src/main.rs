@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use macroquad::{
-    input::{is_key_pressed, KeyCode},
+    input::{is_key_pressed, is_quit_requested, prevent_quit, KeyCode},
     prelude::{next_frame, Conf},
 };
 
@@ -12,11 +12,19 @@ mod timing;
 mod util;
 mod visualizer;
 
-const WINDOW_WIDTH: i32 = 200;
-const WINDOW_HEIGHT: i32 = 200;
+const BPM_FOR_EIGTH_NOTE: u16 = 72 * 3;
+const SHORTEN: bool = true;
+
+const WINDOW_WIDTH: i32 = 1000;
+const WINDOW_HEIGHT: i32 = 1000;
+
 const EXPORT: bool = true;
 const EXPORT_DIR: &str = "output/";
 const EXPORT_FPS: u32 = 30;
+const NUM_EXPORT_THREADS: usize = 10;
+const MAX_EXPORT_QUEUE_SIZE: usize = 40;
+
+const PLAY_ON_EXPORT: bool = false;
 
 fn window_conf() -> Conf {
     Conf {
@@ -30,33 +38,50 @@ fn window_conf() -> Conf {
 }
 #[macroquad::main(window_conf)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // let music = music::PianoPhase::new(120 * 4);
-    let music = music::PianoPhase::new_shortened(72 * 6);
-    // let music = music::PianoPhase::new_shortened(50);
+    prevent_quit();
+
+    let music = if SHORTEN { music::PianoPhase::new_shortened(BPM_FOR_EIGTH_NOTE * 2) } else { music::PianoPhase::new(BPM_FOR_EIGTH_NOTE * 2) };
+
     let mut timing = timing::Timing::new(if EXPORT { Some(EXPORT_FPS) } else { None });
-    let mut exporter = exporter::Exporter::new(EXPORT_DIR.into())?;
+    let mut exporter = exporter::Exporter::new(EXPORT_DIR.into(), NUM_EXPORT_THREADS, MAX_EXPORT_QUEUE_SIZE)?;
     let mut player = player::Player::new()?;
     let mut visualizer = visualizer::Visualizer::new().await?;
 
+    let should_play = if EXPORT { PLAY_ON_EXPORT } else { true };
+
     loop {
-        if is_key_pressed(KeyCode::Right) {
-            timing.seek_forward(Duration::from_secs(5));
+        if !EXPORT {
+            if is_key_pressed(KeyCode::Right) {
+                timing.seek_forward(Duration::from_secs(5));
+            }
+            if is_key_pressed(KeyCode::Left) {
+                timing.seek_backwards(Duration::from_secs(5));
+            }
+            if is_key_pressed(KeyCode::Space) {
+                timing.toggle_stopped();
+            }
         }
-        if is_key_pressed(KeyCode::Left) {
-            timing.seek_backwards(Duration::from_secs(5));
-        }
-        if is_key_pressed(KeyCode::Space) {
-            timing.toggle_stopped();
+
+        if is_quit_requested() {
+            break;
         }
 
         timing.update();
         visualizer.update(&timing, &music);
-        player.update(&timing, &music);
+        if should_play {
+            player.update(&timing, &music);
+        }
 
         if EXPORT {
             exporter.export_frame();
         }
 
-        next_frame().await
+        if !EXPORT {
+            next_frame().await
+        }
     }
+
+    exporter.finish();
+
+    Ok(())
 }
