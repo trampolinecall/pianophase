@@ -95,7 +95,8 @@ impl<'font> Staff<'font> {
         &self,
         x_coord_on_staff: f32,
         pitch: u8,
-        color: Color,
+        note_color: Color,
+        beam_color: Color,
         stem_end_y: f32,
         num_beams: u32,
         beam_left: Option<f32>,
@@ -131,7 +132,7 @@ impl<'font> Staff<'font> {
                 &Glyph::NoteheadBlack.codepoint().to_string(),
                 notehead_drawn_position.x,
                 notehead_drawn_position.y,
-                TextParams { rotation, ..self.font.make_text_params(self, color) },
+                TextParams { rotation, ..self.font.make_text_params(self, note_color) },
             );
         }
 
@@ -158,7 +159,7 @@ impl<'font> Staff<'font> {
                 .to_string(),
                 accidental_position.x,
                 accidental_position.y,
-                TextParams { rotation: accidental_rotation, ..self.font.make_text_params(self, color) },
+                TextParams { rotation: accidental_rotation, ..self.font.make_text_params(self, note_color) },
             );
         }
 
@@ -185,7 +186,7 @@ impl<'font> Staff<'font> {
                 stem_end_drawn_position.x,
                 stem_end_drawn_position.y,
                 stem_thickness,
-                color,
+                note_color,
             );
         }
 
@@ -216,7 +217,7 @@ impl<'font> Staff<'font> {
                                 beam_right_drawn_position.x,
                                 beam_right_drawn_position.y,
                                 beam_thickness * self.staff_space as f32,
-                                color,
+                                beam_color,
                             );
                         }
                         StaffPosition::Circular { center_x, center_y, outer_radius } => {
@@ -228,7 +229,7 @@ impl<'font> Staff<'font> {
                                 beam_left.to_degrees() - 90.0,
                                 beam_thickness * self.staff_space as f32,
                                 (beam_right - beam_left).to_degrees(),
-                                color,
+                                beam_color,
                             );
                         }
                     }

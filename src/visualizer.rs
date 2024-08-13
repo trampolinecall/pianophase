@@ -137,20 +137,23 @@ fn draw_wheel(font: &notation::Font, current_time: f32, segment: &Segment, cente
         (current_time - segment.start_time.to_f32().unwrap()) / (segment.end_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap());
     let current_measure = segment.find_measure(current_time);
     let offset_in_measure = remap(current_time, current_measure.start_time.to_f32().unwrap(), current_measure.end_time.to_f32().unwrap(), 0.0, 1.0);
-    let offset_in_measure_rounded = (offset_in_measure * segment.pattern.0.len() as f32).floor() / segment.pattern.0.len() as f32;
+    let current_note_index = (offset_in_measure * segment.pattern.0.len() as f32).floor() as usize;
+    let offset_in_measure_rounded = current_note_index as f32 / segment.pattern.0.len() as f32;
 
     let current_dynamic = segment.dynamic.interpolate(offset_in_segment);
 
-    let foreground_color = colors::FOREGROUND_COLOR.modify_a(|a| a * current_dynamic);
+    let thing_color = colors::FOREGROUND_COLOR.modify_a(|a| a * current_dynamic);
+    let normal_note_color = thing_color;
+    let highlighted_note_color = colors::IMPORTANT_FOREGROUND_COLOR.modify_a(|a| a * current_dynamic);
     let highlight_color = colors::HIGHLIGHT_COLOR.modify_a(|a| a * current_dynamic);
 
     let spinner_end_x = center_x + (offset_in_measure * f32::TAU() - f32::PI() / 2.0).cos() * spinner_radius;
     let spinner_end_y = center_y + (offset_in_measure * f32::TAU() - f32::PI() / 2.0).sin() * spinner_radius;
-    draw_line(center_x, center_y, spinner_end_x, spinner_end_y, 5.0, foreground_color);
+    draw_line(center_x, center_y, spinner_end_x, spinner_end_y, 5.0, thing_color);
 
     let dot_x = center_x + (offset_in_measure_rounded * f32::TAU() - f32::PI() / 2.0).cos() * dot_radius;
     let dot_y = center_y + (offset_in_measure_rounded * f32::TAU() - f32::PI() / 2.0).sin() * dot_radius;
-    draw_circle(dot_x, dot_y, 2.7, foreground_color);
+    draw_circle(dot_x, dot_y, 2.7, thing_color);
 
     draw_arc(
         center_x,
@@ -183,7 +186,9 @@ fn draw_wheel(font: &notation::Font, current_time: f32, segment: &Segment, cente
             crate::music::Hand::Right => STEM_ABOVE_Y,
         };
 
-        staff.draw_note(note_angle, note.pitch, foreground_color, stem_end_y, 2, beam_left, beam_right)
+        let note_color = if note_i == current_note_index { highlighted_note_color } else { normal_note_color };
+
+        staff.draw_note(note_angle, note.pitch, note_color, normal_note_color, stem_end_y, 2, beam_left, beam_right)
     }
 }
 
@@ -233,10 +238,10 @@ fn draw_in_sync_staff(font: &notation::Font, music: &PianoPhase, window: Rect, c
                         note.time.to_f32().unwrap(),
                         current_time - window_duration.to_f32().unwrap() * 0.8,
                         current_time - window_duration.to_f32().unwrap() * 0.5,
-                        0.0,
+                        0.25,
                         1.0,
                     ),
-                    0.0,
+                    0.25,
                     1.0,
                 );
 
@@ -254,15 +259,11 @@ fn draw_in_sync_staff(font: &notation::Font, music: &PianoPhase, window: Rect, c
                 let left_beam_x = left_beam_time.map(|t| remap_time_to_x(t.to_f32().unwrap()));
                 let right_beam_x = right_beam_time.map(|t| remap_time_to_x(t.to_f32().unwrap()));
 
-                staff.draw_note(
-                    note_x,
-                    note.pitch,
-                    colors::FOREGROUND_COLOR.set_a(note.volume * note_fade),
-                    stem_end_y,
-                    2,
-                    left_beam_x,
-                    right_beam_x,
-                );
+                let note_color = if note.time == notes.last().unwrap().time { colors::IMPORTANT_FOREGROUND_COLOR } else { colors::FOREGROUND_COLOR }
+                    .set_a(note.volume * note_fade);
+                let beam_color = colors::FOREGROUND_COLOR.set_a(note.volume * note_fade);
+
+                staff.draw_note(note_x, note.pitch, note_color, beam_color, stem_end_y, 2, left_beam_x, right_beam_x);
             }
         };
 
@@ -280,6 +281,7 @@ fn draw_out_of_sync_staff(
     part2_segment_index: Option<usize>,
 ) {
     // TODO: this code was copied and pasted from draw_in_sync_staff and duplicates a lot of it
+    // TODO: this code also duplicates a lot of draw_wheel
     let staff_space = (window.w / 120.0) as u16;
     let staff_1_top = window.y + window.h * 0.3 - staff_space as f32 * 2.0; // center the staff vertically
     let staff_2_top = window.y + window.h * 0.7 - staff_space as f32 * 2.0; // center the staff vertically
@@ -292,17 +294,19 @@ fn draw_out_of_sync_staff(
 
         let staff = Staff::new(font, StaffPosition::Straight { top: staff_top, left: staff_left, right: staff_left + staff_width }, staff_space);
 
+        let pattern_len = segment.pattern.0.len();
+
         let offset_in_segment =
             (current_time - segment.start_time.to_f32().unwrap()) / (segment.end_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap());
         let current_measure = segment.find_measure(current_time);
         let offset_in_measure =
             remap(current_time, current_measure.start_time.to_f32().unwrap(), current_measure.end_time.to_f32().unwrap(), 0.0, 1.0);
-
-        let pattern_len = segment.pattern.0.len();
+        let current_note_index = (offset_in_measure * pattern_len as f32).floor() as usize;
 
         let current_dynamic = segment.dynamic.interpolate(offset_in_segment);
 
-        let foreground_color = colors::FOREGROUND_COLOR.modify_a(|a| a * current_dynamic);
+        let normal_note_color = colors::FOREGROUND_COLOR.modify_a(|a| a * current_dynamic);
+        let highlighted_note_color = colors::IMPORTANT_FOREGROUND_COLOR.modify_a(|a| a * current_dynamic);
         let highlight_color = colors::HIGHLIGHT_COLOR.modify_a(|a| a * current_dynamic);
 
         staff.draw(colors::FOREGROUND_COLOR);
@@ -314,6 +318,14 @@ fn draw_out_of_sync_staff(
 
         staff.draw_starting_repeat_sign(notes_start_x - REPEAT_WIDTH * 0.5, colors::FOREGROUND_COLOR);
         staff.draw_ending_repeat_sign(last_note_x_position + REPEAT_WIDTH * 0.5, colors::FOREGROUND_COLOR);
+
+        draw_rectangle(
+            staff_left + notes_start_x * staff.staff_space as f32,
+            staff_top,
+            lerp(0.0, last_note_x_position - notes_start_x, offset_in_measure) * staff.staff_space as f32,
+            staff.staff_height as f32,
+            highlight_color,
+        );
 
         for (note_i, note) in segment.pattern.0.iter().enumerate() {
             let note_x = remap(note_i as f32, 0.0, pattern_len as f32, notes_start_x, last_note_x_position);
@@ -335,16 +347,10 @@ fn draw_out_of_sync_staff(
                 crate::music::Hand::Right => STEM_ABOVE_Y,
             };
 
-            staff.draw_note(note_x, note.pitch, foreground_color, stem_end_y, 2, beam_left, beam_right)
-        }
+            let note_color = if note_i == current_note_index { highlighted_note_color } else { normal_note_color };
 
-        draw_rectangle(
-            staff_left + notes_start_x * staff.staff_space as f32,
-            staff_top,
-            lerp(0.0, last_note_x_position - notes_start_x, offset_in_measure) * staff.staff_space as f32,
-            staff.staff_height as f32,
-            highlight_color,
-        );
+            staff.draw_note(note_x, note.pitch, note_color, normal_note_color, stem_end_y, 2, beam_left, beam_right)
+        }
 
         match segment.dynamic {
             crate::music::Dynamic::Crescendo => staff.draw_crescendo(hairpin_y, notes_start_x, last_note_x_position, colors::FOREGROUND_COLOR),

@@ -1,3 +1,4 @@
+
 use macroquad::color::Color;
 
 macro_rules! color_constant {
@@ -14,6 +15,7 @@ macro_rules! color_constant {
 color_constant!(BACKGROUND_COLOR, 0xe7e4e5ffu32);
 color_constant!(FOREGROUND_COLOR, 0x2b121cffu32);
 color_constant!(HIGHLIGHT_COLOR, 0xc86aa190u32);
+color_constant!(IMPORTANT_FOREGROUND_COLOR, 0xff0000ffu32);
 
 pub trait ColorExt {
     fn set_r(&self, r: f32) -> Self;

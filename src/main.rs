@@ -13,19 +13,19 @@ mod util;
 mod visualizer;
 
 const BPM_FOR_EIGTH_NOTE: u16 = 72 * 3;
-const SHORTEN: bool = true;
+const SHORTEN: bool = false;
 
 const WINDOW_WIDTH: i32 = 1000;
 const WINDOW_HEIGHT: i32 = 1000;
 
-const EXPORT: bool = true;
+const EXPORT: bool = false;
 const MIDI_EXPORT_PATH: &str = "output.midi";
 const FRAMES_EXPORT_DIR: &str = "output/";
 const EXPORT_FPS: u32 = 30;
-const NUM_EXPORT_THREADS: usize = 10;
-const MAX_EXPORT_QUEUE_SIZE: usize = 40;
+const NUM_EXPORT_THREADS: usize = 12;
+const MAX_EXPORT_QUEUE_SIZE: usize = 100;
 
-const WAIT_FOR_FRAMES_ON_EXPORT: bool = false;
+const WAIT_FOR_FRAMES_ON_EXPORT: bool = true;
 const PLAY_ON_EXPORT: bool = false;
 
 fn window_conf() -> Conf {
