@@ -16,7 +16,7 @@ fn window_conf() -> Conf {
 }
 #[macroquad::main(window_conf)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // let music = music::PianoPhase::new(110 * 4);
+    // let music = music::PianoPhase::new(120 * 4);
     let music = music::PianoPhase::new_shortened(110 * 4);
     // let music = music::PianoPhase::new_shortened(50);
     let mut timing = timing::Timing::new();

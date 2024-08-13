@@ -16,7 +16,7 @@ pub const STEM_BELOW_Y: f32 = 8.0;
 pub const DYNAMICS_Y: f32 = 10.0;
 
 pub const CLEF_OFFSET: f32 = 1.0;
-pub const CLEF_WIDTH: f32 = 5.0;
+pub const CLEF_WIDTH: f32 = 6.0;
 pub const REPEAT_WIDTH: f32 = 4.0; // TODO: this should depend on the font
 
 #[allow(clippy::manual_non_exhaustive)]

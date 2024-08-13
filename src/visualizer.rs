@@ -1,6 +1,6 @@
 use macroquad::{
     math::{clamp, Rect},
-    shapes::{draw_arc, draw_circle, draw_line, draw_rectangle, draw_rectangle_lines},
+    shapes::{draw_arc, draw_circle, draw_line, draw_rectangle},
     text::{draw_text_ex, Font, TextParams},
     window::{clear_background, screen_height, screen_width},
 };
@@ -90,7 +90,7 @@ fn draw_status_text(
     const LEFT_X: f32 = 10.0;
 
     let go = |segment: &Segment, part_name: &'static str, y_position: f32| {
-        let status = if segment.speed != Ratio::ONE { "Phasing..." } else { "Steady" };
+        let status = if segment.speed != Ratio::ONE { "Phasing" } else { "Steady" };
 
         let bpm = music.tempo as f32 / 2.0 * segment.speed.to_f32().unwrap();
 
