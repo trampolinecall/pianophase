@@ -60,7 +60,6 @@ pub struct FlattenedNote {
     pub time: Rational32,
     pub length: Rational32,
     pub volume: f32,
-    pub hand: Hand,
 
     pub segment_index: usize,
     pub measure_number: usize,
@@ -162,7 +161,6 @@ impl PartBuilder {
                         length: Ratio::ONE / speed,
                         volume: dynamic.interpolate(note_index as f32 / total_number_of_notes as f32),
                         segment_index,
-                        hand: note.hand,
                         measure_number,
                     });
                 }
