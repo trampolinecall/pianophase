@@ -198,7 +198,7 @@ fn draw_in_sync_staff(font: &Font, music: &PianoPhase, current_time: f32) {
             );
 
             let actual_segment = &part.segments[note.segment_index];
-            let actual_measure = actual_segment.find_measure(note.time.to_f32().unwrap());
+            let actual_measure = actual_segment.get_measure(note.measure_number);
             let notes_in_actual_measure = part.find_note_range(|n| n.time < actual_measure.start_time, |n| n.time < actual_measure.end_time);
 
             let left_beam_time = if note.time != notes_in_actual_measure[0].time { Some(note.time - Ratio::new(1, 2)) } else { None };

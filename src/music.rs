@@ -116,11 +116,13 @@ impl Segment {
         Ratio::from_integer(self.pattern.0.len() as i32) / self.speed
     }
     pub fn find_measure(&self, time: f32) -> Measure {
-        let repetition_number = ((time - self.start_time.to_f32().unwrap()) / self.single_measure_duration().to_f32().unwrap()).floor() as usize;
-        let start_time = Ratio::from_integer(repetition_number as i32) * self.single_measure_duration() + self.start_time;
+        let measure_number = ((time - self.start_time.to_f32().unwrap()) / self.single_measure_duration().to_f32().unwrap()).floor() as usize;
+        self.get_measure(measure_number)
+    }
+    pub fn get_measure(&self, measure_number: usize) -> Measure {
+        let start_time = Ratio::from_integer(measure_number as i32) * self.single_measure_duration() + self.start_time;
         let end_time = start_time + self.single_measure_duration();
-
-        Measure { start_time, end_time, number: repetition_number }
+        Measure { start_time, end_time, number: measure_number }
     }
 }
 
