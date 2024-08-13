@@ -1,8 +1,8 @@
 use macroquad::{
-    math::clamp,
-    shapes::{draw_arc, draw_circle, draw_line, draw_rectangle},
+    math::{clamp, Rect},
+    shapes::{draw_arc, draw_circle, draw_line, draw_rectangle, draw_rectangle_lines},
     text::{draw_text_ex, Font, TextParams},
-    window::clear_background,
+    window::{clear_background, screen_height, screen_width},
 };
 use num_rational::{Ratio, Rational32};
 use num_traits::{FloatConst, ToPrimitive};
@@ -13,7 +13,7 @@ use crate::{
     util::{lerp, remap},
     visualizer::{
         colors::ColorExt,
-        notation::{Staff, StaffPosition, STEM_ABOVE_Y, STEM_BELOW_Y},
+        notation::{Staff, StaffPosition, CLEF_OFFSET, CLEF_WIDTH, DYNAMICS_Y, REPEAT_WIDTH, STEM_ABOVE_Y, STEM_BELOW_Y},
     },
 };
 
@@ -39,19 +39,42 @@ impl Visualizer {
         let part1_segment_index = music.part1.find_segment_for_time(current_time);
         let part2_segment_index = music.part2.find_segment_for_time(current_time);
 
+        let screen_width = screen_width();
+        let screen_height = screen_height();
+
         draw_status_text(&self.text_font, &self.notation_font, music, current_time, part1_segment_index, part2_segment_index);
 
-        const STAFF_RADIUS: f32 = 200.0;
-        // TODO: adjust to window size
+        let wheel_radius = f32::min(screen_width * 0.5 * 0.4 * 0.8, screen_height * 0.5 * 0.4 * 0.8);
         if let Some(part1_segment_index) = part1_segment_index {
-            draw_wheel(&self.notation_font, current_time, &music.part1.segments[part1_segment_index], 1280.0 * 0.25, 720.0 / 2.0, STAFF_RADIUS);
+            draw_wheel(
+                &self.notation_font,
+                current_time,
+                &music.part1.segments[part1_segment_index],
+                screen_width * 0.25,
+                screen_height * 0.3,
+                wheel_radius,
+            );
         }
         if let Some(part2_segment_index) = part2_segment_index {
-            draw_wheel(&self.notation_font, current_time, &music.part2.segments[part2_segment_index], 1280.0 * 0.75, 720.0 / 2.0, STAFF_RADIUS);
+            draw_wheel(
+                &self.notation_font,
+                current_time,
+                &music.part2.segments[part2_segment_index],
+                screen_width * 0.75,
+                screen_height * 0.3,
+                wheel_radius,
+            );
         }
 
-        draw_in_sync_staff(&self.notation_font, music, current_time);
-        draw_out_of_sync_staff(&self.notation_font, music, current_time, part1_segment_index, part2_segment_index);
+        draw_in_sync_staff(&self.notation_font, music, Rect::new(0.0, screen_height * 0.5, screen_width, screen_height * 0.5 * 0.333), current_time);
+        draw_out_of_sync_staff(
+            &self.notation_font,
+            music,
+            Rect::new(0.0, screen_height * (0.5 + 0.5 * 0.333), screen_width, screen_height * 0.5 * 0.667),
+            current_time,
+            part1_segment_index,
+            part2_segment_index,
+        );
     }
 }
 
@@ -103,7 +126,8 @@ fn draw_status_text(
 }
 
 fn draw_wheel(font: &notation::Font, current_time: f32, segment: &Segment, center_x: f32, center_y: f32, staff_outer_radius: f32) {
-    let staff = Staff::new(font, StaffPosition::Circular { center_x, center_y, outer_radius: staff_outer_radius }, 6);
+    let staff =
+        Staff::new(font, StaffPosition::Circular { center_x, center_y, outer_radius: staff_outer_radius }, (staff_outer_radius * 0.15 / 4.0) as u16);
     staff.draw(colors::FOREGROUND_COLOR);
 
     let dot_radius = staff_outer_radius - STEM_BELOW_Y * staff.staff_space as f32 - 20.0;
@@ -122,11 +146,11 @@ fn draw_wheel(font: &notation::Font, current_time: f32, segment: &Segment, cente
 
     let spinner_end_x = center_x + (offset_in_measure * f32::TAU() - f32::PI() / 2.0).cos() * spinner_radius;
     let spinner_end_y = center_y + (offset_in_measure * f32::TAU() - f32::PI() / 2.0).sin() * spinner_radius;
-    draw_line(center_x, center_y, spinner_end_x, spinner_end_y, 10.0, foreground_color);
+    draw_line(center_x, center_y, spinner_end_x, spinner_end_y, 5.0, foreground_color);
 
     let dot_x = center_x + (offset_in_measure_rounded * f32::TAU() - f32::PI() / 2.0).cos() * dot_radius;
     let dot_y = center_y + (offset_in_measure_rounded * f32::TAU() - f32::PI() / 2.0).sin() * dot_radius;
-    draw_circle(dot_x, dot_y, 7.0, foreground_color);
+    draw_circle(dot_x, dot_y, 2.7, foreground_color);
 
     draw_arc(
         center_x,
@@ -163,72 +187,85 @@ fn draw_wheel(font: &notation::Font, current_time: f32, segment: &Segment, cente
     }
 }
 
-fn draw_in_sync_staff(font: &notation::Font, music: &PianoPhase, current_time: f32) {
-    const STAFF_LEFT: f32 = 200.0;
-    const STAFF_TOP_Y: f32 = 600.0;
-    // TODO: calculate these positions instead of hardcoding them
-    let staff = Staff::new(font, StaffPosition::Straight { top: STAFF_TOP_Y, left: STAFF_LEFT, right: 800.0 }, 6);
-
-    // TODO: also calculate this
-    // this is measured in staff spaces now
-    const NOTE_HORIZ_SPACE: f32 = 10.0;
-
-    let draw_past_notes = |staff: &Staff, part: &Part, window_duration: Rational32, stem_end_y: f32| {
-        let notes = part.find_note_range(
-            |note| note.time.to_f32().unwrap() < (current_time - window_duration.to_f32().unwrap()),
-            |note| note.time.to_f32().unwrap() <= current_time,
-        );
-
-        staff.draw_treble_clef(0.0, colors::FOREGROUND_COLOR);
-        let notes_left = 10.0;
-        for note in notes {
-            // TODO: clean up this code
-            let base_speed_segment = &music.part1.segments[music.part1.find_segment_for_time(note.time.to_f32().unwrap()).unwrap()];
-            let base_speed_measure = base_speed_segment.find_measure(note.time.to_f32().unwrap());
-
-            let remap_time_to_x = |time| {
-                remap(
-                    time,
-                    base_speed_measure.start_time.to_f32().unwrap(),
-                    base_speed_measure.end_time.to_f32().unwrap(),
-                    notes_left,
-                    base_speed_segment.single_measure_duration().to_f32().unwrap() * NOTE_HORIZ_SPACE + notes_left,
-                )
-            };
-
-            let note_x = remap_time_to_x(note.time.to_f32().unwrap());
-
-            let note_fade = clamp(
-                remap(
-                    note.time.to_f32().unwrap(),
-                    current_time - window_duration.to_f32().unwrap() * 0.8,
-                    current_time - window_duration.to_f32().unwrap() * 0.5,
-                    0.0,
-                    1.0,
-                ),
-                0.0,
-                1.0,
-            );
-
-            let actual_segment = &part.segments[note.segment_index];
-            let actual_measure = actual_segment.get_measure(note.measure_number);
-            let notes_in_actual_measure = part.find_note_range(|n| n.time < actual_measure.start_time, |n| n.time < actual_measure.end_time);
-
-            let left_beam_time = if note.time != notes_in_actual_measure[0].time { Some(note.time - Ratio::new(1, 2)) } else { None };
-            let right_beam_time =
-                if note.time != notes_in_actual_measure[notes_in_actual_measure.len() - 1].time { Some(note.time + Ratio::new(1, 2)) } else { None };
-
-            let left_beam_x = left_beam_time.map(|t| remap_time_to_x(t.to_f32().unwrap()));
-            let right_beam_x = right_beam_time.map(|t| remap_time_to_x(t.to_f32().unwrap()));
-
-            staff.draw_note(note_x, note.pitch, colors::FOREGROUND_COLOR.set_a(note.volume * note_fade), stem_end_y, 2, left_beam_x, right_beam_x);
-        }
-    };
-
+fn draw_in_sync_staff(font: &notation::Font, music: &PianoPhase, window: Rect, current_time: f32) {
     let base_time_segment_index = music.part1.find_segment_for_time(current_time);
     if let Some(base_time_segment_index) = base_time_segment_index {
-        staff.draw(colors::FOREGROUND_COLOR);
         let window_length = music.part1.segments[base_time_segment_index].single_measure_duration();
+
+        let staff_space = (window.w / 120.0) as u16;
+        let note_horiz_space = 8.0;
+        let staff_width = (window_length.to_f32().unwrap() * note_horiz_space + CLEF_OFFSET + CLEF_WIDTH) * staff_space as f32;
+        let staff_left = window.x + window.w * 0.5 - staff_width * 0.5;
+        let staff_top = window.y + window.h * 0.5 - staff_space as f32 * 2.0; // center the staff vertically
+
+        let staff = Staff::new(font, StaffPosition::Straight { top: staff_top, left: staff_left, right: staff_left + staff_width }, staff_space);
+
+        staff.draw(colors::FOREGROUND_COLOR);
+
+        let draw_past_notes = |staff: &Staff, part: &Part, window_duration: Rational32, stem_end_y: f32| {
+            let notes = part.find_note_range(
+                |note| note.time.to_f32().unwrap() < (current_time - window_duration.to_f32().unwrap()),
+                |note| note.time.to_f32().unwrap() <= current_time,
+            );
+
+            staff.draw_treble_clef(CLEF_OFFSET, colors::FOREGROUND_COLOR);
+            let notes_left = CLEF_OFFSET + CLEF_WIDTH;
+
+            for note in notes {
+                // TODO: clean up this code
+                let base_speed_segment = &music.part1.segments[music.part1.find_segment_for_time(note.time.to_f32().unwrap()).unwrap()];
+                let base_speed_measure = base_speed_segment.find_measure(note.time.to_f32().unwrap());
+
+                let remap_time_to_x = |time| {
+                    remap(
+                        time,
+                        base_speed_measure.start_time.to_f32().unwrap(),
+                        base_speed_measure.end_time.to_f32().unwrap(),
+                        notes_left,
+                        base_speed_segment.single_measure_duration().to_f32().unwrap() * note_horiz_space + notes_left,
+                    )
+                };
+
+                let note_x = remap_time_to_x(note.time.to_f32().unwrap());
+
+                let note_fade = clamp(
+                    remap(
+                        note.time.to_f32().unwrap(),
+                        current_time - window_duration.to_f32().unwrap() * 0.8,
+                        current_time - window_duration.to_f32().unwrap() * 0.5,
+                        0.0,
+                        1.0,
+                    ),
+                    0.0,
+                    1.0,
+                );
+
+                let actual_segment = &part.segments[note.segment_index];
+                let actual_measure = actual_segment.get_measure(note.measure_number);
+                let notes_in_actual_measure = part.find_note_range(|n| n.time < actual_measure.start_time, |n| n.time < actual_measure.end_time);
+
+                let left_beam_time = if note.time != notes_in_actual_measure[0].time { Some(note.time - Ratio::new(1, 2)) } else { None };
+                let right_beam_time = if note.time != notes_in_actual_measure[notes_in_actual_measure.len() - 1].time {
+                    Some(note.time + Ratio::new(1, 2))
+                } else {
+                    None
+                };
+
+                let left_beam_x = left_beam_time.map(|t| remap_time_to_x(t.to_f32().unwrap()));
+                let right_beam_x = right_beam_time.map(|t| remap_time_to_x(t.to_f32().unwrap()));
+
+                staff.draw_note(
+                    note_x,
+                    note.pitch,
+                    colors::FOREGROUND_COLOR.set_a(note.volume * note_fade),
+                    stem_end_y,
+                    2,
+                    left_beam_x,
+                    right_beam_x,
+                );
+            }
+        };
+
         draw_past_notes(&staff, &music.part1, window_length, STEM_ABOVE_Y);
         draw_past_notes(&staff, &music.part2, window_length, STEM_BELOW_Y);
     }
@@ -237,25 +274,24 @@ fn draw_in_sync_staff(font: &notation::Font, music: &PianoPhase, current_time: f
 fn draw_out_of_sync_staff(
     font: &notation::Font,
     music: &PianoPhase,
+    window: Rect,
     current_time: f32,
     part1_segment_index: Option<usize>,
     part2_segment_index: Option<usize>,
 ) {
     // TODO: this code was copied and pasted from draw_in_sync_staff and duplicates a lot of it
+    let staff_space = (window.w / 120.0) as u16;
+    let staff_1_top = window.y + window.h * 0.3 - staff_space as f32 * 2.0; // center the staff vertically
+    let staff_2_top = window.y + window.h * 0.7 - staff_space as f32 * 2.0; // center the staff vertically
 
-    const STAFF_LEFT: f32 = 200.0;
-    const STAFF_1_TOP_Y: f32 = 800.0;
-    const STAFF_2_TOP_Y: f32 = 900.0;
+    let go = |segment: &Segment, staff_top: f32, hairpin_y: f32| {
+        let note_horiz_space = 8.0;
+        let staff_width =
+            (segment.pattern.0.len() as f32 * note_horiz_space + CLEF_OFFSET + CLEF_WIDTH + REPEAT_WIDTH + REPEAT_WIDTH) * staff_space as f32;
+        let staff_left = window.x + window.w * 0.5 - staff_width * 0.5;
 
-    // TODO: also calculate this
-    // this is measured in staff spaces now
-    const NOTE_HORIZ_SPACE: f32 = 5.0;
+        let staff = Staff::new(font, StaffPosition::Straight { top: staff_top, left: staff_left, right: staff_left + staff_width }, staff_space);
 
-    // TODO: calculate these positions instead of hardcoding them
-    let top_staff = Staff::new(font, StaffPosition::Straight { top: STAFF_1_TOP_Y, left: STAFF_LEFT, right: 800.0 }, 6);
-    let bottom_staff = Staff::new(font, StaffPosition::Straight { top: STAFF_2_TOP_Y, left: STAFF_LEFT, right: 800.0 }, 6);
-
-    let go = |segment: &Segment, staff: &Staff, staff_top: f32, hairpin_y: f32| {
         let offset_in_segment =
             (current_time - segment.start_time.to_f32().unwrap()) / (segment.end_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap());
         let current_measure = segment.find_measure(current_time);
@@ -271,13 +307,13 @@ fn draw_out_of_sync_staff(
 
         staff.draw(colors::FOREGROUND_COLOR);
 
-        staff.draw_treble_clef(0.0, colors::FOREGROUND_COLOR);
+        staff.draw_treble_clef(CLEF_OFFSET, colors::FOREGROUND_COLOR);
 
-        let notes_start_x = 10.0;
-        let last_note_x_position = notes_start_x + pattern_len as f32 * NOTE_HORIZ_SPACE;
+        let notes_start_x = CLEF_OFFSET + CLEF_WIDTH + REPEAT_WIDTH;
+        let last_note_x_position = notes_start_x + pattern_len as f32 * note_horiz_space;
 
-        staff.draw_starting_repeat_sign(notes_start_x - 0.5, colors::FOREGROUND_COLOR);
-        staff.draw_ending_repeat_sign(last_note_x_position + 0.5, colors::FOREGROUND_COLOR);
+        staff.draw_starting_repeat_sign(notes_start_x - REPEAT_WIDTH * 0.5, colors::FOREGROUND_COLOR);
+        staff.draw_ending_repeat_sign(last_note_x_position + REPEAT_WIDTH * 0.5, colors::FOREGROUND_COLOR);
 
         for (note_i, note) in segment.pattern.0.iter().enumerate() {
             let note_x = remap(note_i as f32, 0.0, pattern_len as f32, notes_start_x, last_note_x_position);
@@ -303,7 +339,7 @@ fn draw_out_of_sync_staff(
         }
 
         draw_rectangle(
-            STAFF_LEFT + notes_start_x * staff.staff_space as f32,
+            staff_left + notes_start_x * staff.staff_space as f32,
             staff_top,
             lerp(0.0, last_note_x_position - notes_start_x, offset_in_measure) * staff.staff_space as f32,
             staff.staff_height as f32,
@@ -318,9 +354,9 @@ fn draw_out_of_sync_staff(
     };
 
     if let Some(part1_segment_index) = part1_segment_index {
-        go(&music.part1.segments[part1_segment_index], &top_staff, STAFF_1_TOP_Y, 9.0);
+        go(&music.part1.segments[part1_segment_index], staff_1_top, DYNAMICS_Y);
     }
     if let Some(part2_segment_index) = part2_segment_index {
-        go(&music.part2.segments[part2_segment_index], &bottom_staff, STAFF_2_TOP_Y, 9.0);
+        go(&music.part2.segments[part2_segment_index], staff_2_top, DYNAMICS_Y);
     }
 }
