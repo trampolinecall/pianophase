@@ -70,7 +70,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             break;
         }
 
-        timing.update();
         visualizer.update(&timing, &music);
         if should_play {
             player.update(&timing, &music);
@@ -80,6 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             exporter.export_frame();
         }
 
+        timing.update();
         if should_wait_for_frames {
             next_frame().await
         }
