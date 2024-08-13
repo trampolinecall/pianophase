@@ -42,7 +42,15 @@ impl Visualizer {
         let screen_width = screen_width();
         let screen_height = screen_height();
 
-        draw_status_text(&self.text_font, &self.notation_font, music, current_time, part1_segment_index, part2_segment_index);
+        draw_status_text(
+            &self.text_font,
+            &self.notation_font,
+            music,
+            current_time,
+            (screen_width / 50.0).ceil() as u16,
+            part1_segment_index,
+            part2_segment_index,
+        );
 
         let wheel_radius = f32::min(screen_width * 0.5 * 0.4 * 0.8, screen_height * 0.5 * 0.4 * 0.8);
         if let Some(part1_segment_index) = part1_segment_index {
@@ -83,11 +91,11 @@ fn draw_status_text(
     notation_font: &notation::Font,
     music: &PianoPhase,
     current_time: f32,
+    font_size: u16,
     part1_segment_index: Option<usize>,
     part2_segment_index: Option<usize>,
 ) {
-    const FONT_SIZE: u16 = 24;
-    const LEFT_X: f32 = 10.0;
+    let left_x: f32 = font_size as f32 * 0.75;
 
     let go = |segment: &Segment, part_name: &'static str, y_position: f32| {
         let status = if segment.speed != Ratio::ONE { "Phasing" } else { "Steady" };
@@ -99,29 +107,29 @@ fn draw_status_text(
 
         let first_part_dims = draw_text_ex(
             &format!("{part_name}: {status} "),
-            LEFT_X,
+            left_x,
             y_position,
-            TextParams { font: Some(text_font), font_size: FONT_SIZE, color: colors::FOREGROUND_COLOR, ..Default::default() },
+            TextParams { font: Some(text_font), font_size, color: colors::FOREGROUND_COLOR, ..Default::default() },
         );
         let eigth_note_dims = draw_text_ex(
             &smufl::Glyph::MetNote8thUp.codepoint().to_string(),
-            LEFT_X + first_part_dims.width,
+            left_x + first_part_dims.width,
             y_position,
-            notation_font.make_text_params_with_size(FONT_SIZE, colors::FOREGROUND_COLOR),
+            notation_font.make_text_params_with_size(font_size, colors::FOREGROUND_COLOR),
         );
         draw_text_ex(
             &format!(" = {bpm:.1} ({current_measure}/{measures_in_segment})"),
-            LEFT_X + first_part_dims.width + eigth_note_dims.width,
+            left_x + first_part_dims.width + eigth_note_dims.width,
             y_position,
-            TextParams { font: Some(text_font), font_size: FONT_SIZE, color: colors::FOREGROUND_COLOR, ..Default::default() },
+            TextParams { font: Some(text_font), font_size, color: colors::FOREGROUND_COLOR, ..Default::default() },
         );
     };
 
     if let Some(part1_segment_index) = part1_segment_index {
-        go(&music.part1.segments[part1_segment_index], "Piano 1", 30.0);
+        go(&music.part1.segments[part1_segment_index], "Piano 1", font_size  as f32 * 1.5);
     }
     if let Some(part2_segment_index) = part2_segment_index {
-        go(&music.part2.segments[part2_segment_index], "Piano 2", 60.0);
+        go(&music.part2.segments[part2_segment_index], "Piano 2", font_size as f32 * 1.5 * 2.0);
     }
 }
 
