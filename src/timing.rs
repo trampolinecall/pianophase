@@ -7,27 +7,32 @@ pub struct Timing {
     time: Duration,
     last_instant: Option<Instant>,
     stopped: bool,
+    constant_fps: Option<u32>,
 }
 
 impl Timing {
-    pub fn new() -> Self {
-        Self { last_time: Duration::ZERO, time: Duration::ZERO, last_instant: None, stopped: true }
+    pub fn new(constant_fps: Option<u32>) -> Self {
+        Self { last_time: Duration::ZERO, time: Duration::ZERO, last_instant: None, stopped: true, constant_fps }
     }
 
     pub fn update(&mut self) {
         self.last_time = self.time;
-        match self.last_instant {
-            Some(last_instant) => {
-                let now = Instant::now();
+        if let Some(constant_fps) = self.constant_fps {
+            self.time += Duration::new(0, 1_000_000_000 / constant_fps);
+        } else {
+            match self.last_instant {
+                Some(last_instant) => {
+                    let now = Instant::now();
 
-                if !self.stopped {
-                    self.time += now.duration_since(last_instant);
+                    if !self.stopped {
+                        self.time += now.duration_since(last_instant);
+                    }
+
+                    self.last_instant = Some(now);
                 }
-
-                self.last_instant = Some(now);
-            }
-            None => {
-                self.last_instant = Some(Instant::now());
+                None => {
+                    self.last_instant = Some(Instant::now());
+                }
             }
         }
     }
