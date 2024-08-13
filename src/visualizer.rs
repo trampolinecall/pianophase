@@ -173,10 +173,10 @@ fn draw_wheel(font: &notation::Font, current_time: f32, segment: &Segment, cente
         // we can't just draw to a fixed offset because that would draw the beam to a certain angle which doesn't account for the stem offset
         let (beam_left, beam_right) = if note_i == 0 || note_i == 1 {
             // draw a beam from the first note to the bottom of the staff
-            (None, Some(f32::PI()))
+            (None, Some(f32::PI() - 1.0))
         } else if note_i == segment.pattern.0.len() - 1 || note_i == segment.pattern.0.len() - 2 {
             // draw a beam from the bottom of the staff to the last note
-            (Some(f32::PI()), None)
+            (Some(f32::PI() - 1.0), None)
         } else {
             (None, None)
         };
@@ -334,10 +334,10 @@ fn draw_out_of_sync_staff(
             // we can't just draw to a fixed offset because that would draw the beam to a certain position which doesn't account for the stem offset
             let (beam_left, beam_right) = if note_i == 0 || note_i == 1 {
                 // draw a beam from the first note to the middle of the staff
-                (None, Some(lerp(0.0, last_note_x_position, 0.5)))
+                (None, Some(lerp(notes_start_x, last_note_x_position, 0.4)))
             } else if note_i == segment.pattern.0.len() - 1 || note_i == segment.pattern.0.len() - 2 {
                 // draw a beam from the middle of the staff to the last note
-                (Some(lerp(0.0, last_note_x_position, 0.5)), None)
+                (Some(lerp(notes_start_x, last_note_x_position, 0.4)), None)
             } else {
                 (None, None)
             };
