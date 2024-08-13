@@ -15,8 +15,8 @@ mod visualizer;
 const BPM_FOR_EIGTH_NOTE: u16 = 72 * 3;
 const SHORTEN: bool = false;
 
-const WINDOW_WIDTH: i32 = 1000;
-const WINDOW_HEIGHT: i32 = 1000;
+const WINDOW_WIDTH: i32 = 4096;
+const WINDOW_HEIGHT: i32 = 4096;
 
 const EXPORT: bool = true;
 const MIDI_EXPORT_PATH: &str = "output.midi";
