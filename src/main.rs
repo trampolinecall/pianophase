@@ -19,11 +19,13 @@ const WINDOW_WIDTH: i32 = 1000;
 const WINDOW_HEIGHT: i32 = 1000;
 
 const EXPORT: bool = true;
-const EXPORT_DIR: &str = "output/";
+const MIDI_EXPORT_PATH: &str = "output.midi";
+const FRAMES_EXPORT_DIR: &str = "output/";
 const EXPORT_FPS: u32 = 30;
 const NUM_EXPORT_THREADS: usize = 10;
 const MAX_EXPORT_QUEUE_SIZE: usize = 40;
 
+const WAIT_FOR_FRAMES_ON_EXPORT: bool = false;
 const PLAY_ON_EXPORT: bool = false;
 
 fn window_conf() -> Conf {
@@ -43,11 +45,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let music = if SHORTEN { music::PianoPhase::new_shortened(BPM_FOR_EIGTH_NOTE * 2) } else { music::PianoPhase::new(BPM_FOR_EIGTH_NOTE * 2) };
 
     let mut timing = timing::Timing::new(if EXPORT { Some(EXPORT_FPS) } else { None });
-    let mut exporter = exporter::Exporter::new(EXPORT_DIR.into(), NUM_EXPORT_THREADS, MAX_EXPORT_QUEUE_SIZE)?;
+    let mut exporter = exporter::Exporter::new(FRAMES_EXPORT_DIR.into(), NUM_EXPORT_THREADS, MAX_EXPORT_QUEUE_SIZE)?;
     let mut player = player::Player::new()?;
     let mut visualizer = visualizer::Visualizer::new().await?;
 
+    if EXPORT {
+        exporter.export_midi(&music, MIDI_EXPORT_PATH)?;
+    }
     let should_play = if EXPORT { PLAY_ON_EXPORT } else { true };
+    let should_wait_for_frames = if EXPORT { WAIT_FOR_FRAMES_ON_EXPORT } else { true };
 
     loop {
         if !EXPORT {
@@ -76,7 +82,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             exporter.export_frame();
         }
 
-        if !EXPORT {
+        if should_wait_for_frames {
             next_frame().await
         }
     }
