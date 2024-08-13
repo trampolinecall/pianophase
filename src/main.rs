@@ -22,6 +22,8 @@ const EXPORT: bool = true;
 const MIDI_EXPORT_PATH: &str = "output.midi";
 const FRAMES_EXPORT_DIR: &str = "output/";
 const EXPORT_FPS: u32 = 60;
+const NUM_EXPORT_THREADS: usize = 12;
+const MAX_EXPORT_QUEUE_SIZE: usize = 100;
 
 const WAIT_FOR_FRAMES_ON_EXPORT: bool = true;
 const PLAY_ON_EXPORT: bool = true;
@@ -43,7 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let music = if SHORTEN { music::PianoPhase::new_shortened(BPM_FOR_EIGTH_NOTE * 2) } else { music::PianoPhase::new(BPM_FOR_EIGTH_NOTE * 2) };
 
     let mut timing = timing::Timing::new(if EXPORT { Some(EXPORT_FPS) } else { None });
-    let mut exporter = exporter::Exporter::new(FRAMES_EXPORT_DIR.into())?;
+    let mut exporter = exporter::Exporter::new(FRAMES_EXPORT_DIR.into(), NUM_EXPORT_THREADS, MAX_EXPORT_QUEUE_SIZE)?;
     let mut player = player::Player::new()?;
     let mut visualizer = visualizer::Visualizer::new().await?;
 
@@ -84,6 +86,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             next_frame().await
         }
     }
+
+    exporter.finish();
 
     Ok(())
 }
