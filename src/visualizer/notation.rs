@@ -293,6 +293,54 @@ impl<'font> Staff<'font> {
             );
         }
     }
+
+    pub fn draw_starting_repeat_sign(&self, x: f32, color: Color) {
+        self.draw_repeat_sign(x, false, color);
+    }
+    pub fn draw_ending_repeat_sign(&self, x: f32, color: Color) {
+        self.draw_repeat_sign(x, true, color);
+    }
+
+    // the x position is the edge of the dots
+    // for a starting repeat barline, the x is the right edge of the dots
+    // for an ending repeat barline, the x is the left edge of the dots
+    fn draw_repeat_sign(&self, x: f32, ending: bool, color: Color) {
+        let thin_barline_thickness = self.font.metadata.engraving_defaults.thin_barline_thickness.unwrap_or(StaffSpaces(0.16)).0 as f32;
+        let thick_barline_thickness = self.font.metadata.engraving_defaults.thick_barline_thickness.unwrap_or(StaffSpaces(0.5)).0 as f32;
+        let thin_thick_barline_separation = self.font.metadata.engraving_defaults.thin_thick_barline_separation.unwrap_or(StaffSpaces(0.4)).0 as f32;
+        let repeat_barline_dot_separation = self.font.metadata.engraving_defaults.repeat_barline_dot_separation.unwrap_or(StaffSpaces(0.16)).0 as f32;
+        let dots_advance_width = self.font.metadata.advance_widths.get(Glyph::RepeatDots).unwrap_or(StaffSpaces(0.4)).0 as f32;
+
+        let dots_x;
+        let thin_line_x;
+        let thick_line_x;
+
+        if ending {
+            dots_x = x;
+            thin_line_x = x + dots_advance_width + repeat_barline_dot_separation + thin_barline_thickness * 0.5;
+            thick_line_x = x + dots_advance_width + repeat_barline_dot_separation + thin_barline_thickness + thin_thick_barline_separation + thick_barline_thickness * 0.5;
+        } else {
+            dots_x = x - dots_advance_width;
+            thin_line_x = x - dots_advance_width - repeat_barline_dot_separation - thin_barline_thickness * 0.5;
+            thick_line_x = x - dots_advance_width - repeat_barline_dot_separation - thin_barline_thickness - thin_thick_barline_separation - thick_barline_thickness * 0.5;
+        }
+
+        let (Vec2 { x: thin_line_x, y: thin_line_top_y }, _) = self.calculate_position(thin_line_x, 0.0);
+        let (Vec2 { x: _, y: thin_line_bottom_y }, _) = self.calculate_position(thin_line_x, 4.0);
+        draw_line(thin_line_x, thin_line_top_y, thin_line_x, thin_line_bottom_y, thin_barline_thickness * self.staff_space as f32, color);
+
+        let (Vec2 { x: thick_line_x, y: thick_line_top_y }, _) = self.calculate_position(thick_line_x, 0.0);
+        let (Vec2 { x: _, y: thick_line_bottom_y }, _) = self.calculate_position(thick_line_x, 4.0);
+        draw_line(thick_line_x, thick_line_top_y, thick_line_x, thick_line_bottom_y, thick_barline_thickness * self.staff_space as f32, color);
+
+        let (Vec2 { x: dots_x, y: dots_y }, dots_rotation) = self.calculate_position(dots_x, 4.0);
+        draw_text_ex(
+            &Glyph::RepeatDots.codepoint().to_string(),
+            dots_x,
+            dots_y,
+            TextParams { rotation: dots_rotation, ..self.font.make_text_params(self, color) },
+        );
+    }
 }
 
 pub fn coord_to_tuple(coord: Coord) -> Vec2 {

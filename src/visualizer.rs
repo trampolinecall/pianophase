@@ -213,7 +213,7 @@ fn draw_in_sync_staff(font: &Font, music: &PianoPhase, current_time: f32) {
         bottom_staff.draw(colors::FOREGROUND_COLOR);
         let window_length = music.part1.segments[base_time_segment_index].single_measure_duration();
         draw_past_notes(&top_staff, &music.part1, window_length, STEM_ABOVE_Y);
-        draw_past_notes(&bottom_staff, &music.part2, window_length, STEM_BELOW_Y);
+        draw_past_notes(&top_staff, &music.part2, window_length, STEM_BELOW_Y);
     }
 }
 
@@ -254,9 +254,10 @@ fn draw_out_of_sync_staff(
 
         staff.draw(colors::FOREGROUND_COLOR);
 
-        let last_note_x_position = pattern_len as f32 * NOTE_HORIZ_SPACE;
+        let notes_start_x = 2.0;
+        let last_note_x_position = notes_start_x + pattern_len as f32 * NOTE_HORIZ_SPACE;
         for (note_i, note) in segment.pattern.0.iter().enumerate() {
-            let note_x = remap(note_i as f32, 0.0, pattern_len as f32, 0.0, last_note_x_position);
+            let note_x = remap(note_i as f32, 0.0, pattern_len as f32, notes_start_x, last_note_x_position);
 
             // only the first and last notes draw beams to simplify things
             // we can't just draw to a fixed offset because that would draw the beam to a certain position which doesn't account for the stem offset
@@ -277,6 +278,9 @@ fn draw_out_of_sync_staff(
 
             staff.draw_note(note_x, note.pitch, foreground_color, stem_end_y, 2, beam_left, beam_right)
         }
+
+        staff.draw_starting_repeat_sign(notes_start_x - 0.5, foreground_color);
+        staff.draw_ending_repeat_sign(last_note_x_position + 0.5, foreground_color);
 
         draw_rectangle(
             STAFF_LEFT,
