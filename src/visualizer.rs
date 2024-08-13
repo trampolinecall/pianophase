@@ -287,7 +287,7 @@ fn draw_out_of_sync_staff(
     let staff_2_top = window.y + window.h * 0.7 - staff_space as f32 * 2.0; // center the staff vertically
 
     let go = |segment: &Segment, staff_top: f32, hairpin_y: f32| {
-        let note_horiz_space = 8.0;
+        let note_horiz_space = 4.0;
         let staff_width =
             (segment.pattern.0.len() as f32 * note_horiz_space + CLEF_OFFSET + CLEF_WIDTH + REPEAT_WIDTH + REPEAT_WIDTH) * staff_space as f32;
         let staff_left = window.x + window.w * 0.5 - staff_width * 0.5;
