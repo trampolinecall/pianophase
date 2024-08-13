@@ -141,6 +141,8 @@ fn draw_wheel(font: &notation::Font, current_time: f32, segment: &Segment, cente
     let dot_radius = staff_outer_radius - STEM_BELOW_Y * staff.staff_space as f32 - 20.0;
     let spinner_radius = staff_outer_radius - STEM_BELOW_Y * staff.staff_space as f32 - 40.0;
 
+    let spinner_thickness = 0.5 * staff.staff_space as f32;
+
     let offset_in_segment =
         (current_time - segment.start_time.to_f32().unwrap()) / (segment.end_time.to_f32().unwrap() - segment.start_time.to_f32().unwrap());
     let current_measure = segment.find_measure(current_time);
@@ -157,11 +159,11 @@ fn draw_wheel(font: &notation::Font, current_time: f32, segment: &Segment, cente
 
     let spinner_end_x = center_x + (offset_in_measure * f32::TAU() - f32::PI() / 2.0).cos() * spinner_radius;
     let spinner_end_y = center_y + (offset_in_measure * f32::TAU() - f32::PI() / 2.0).sin() * spinner_radius;
-    draw_line(center_x, center_y, spinner_end_x, spinner_end_y, 5.0, thing_color);
+    draw_line(center_x, center_y, spinner_end_x, spinner_end_y, spinner_thickness, thing_color);
 
     let dot_x = center_x + (offset_in_measure_rounded * f32::TAU() - f32::PI() / 2.0).cos() * dot_radius;
     let dot_y = center_y + (offset_in_measure_rounded * f32::TAU() - f32::PI() / 2.0).sin() * dot_radius;
-    draw_circle(dot_x, dot_y, 2.7, thing_color);
+    draw_circle(dot_x, dot_y, spinner_thickness * 0.55, thing_color);
 
     draw_arc(
         center_x,
