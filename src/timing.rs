@@ -1,5 +1,8 @@
 use std::time::{Duration, Instant};
 
+use num_rational::Ratio;
+use num_traits::ToPrimitive;
+
 use crate::music::PianoPhase;
 
 pub struct Timing {
@@ -61,5 +64,11 @@ impl Timing {
     pub fn seek_backwards(&mut self, amount: Duration) {
         self.time = self.time.saturating_sub(amount);
         self.last_time = self.time;
+    }
+
+    pub fn should_end(&self, music: &PianoPhase) -> bool {
+        let last_note_end = music.part1.flattened.iter().chain(&music.part2.flattened).map(|n| n.time + n.length).max().unwrap();
+        // stop one second after everything is over
+        self.current_musical_time(music) > (last_note_end + Ratio::ONE).to_f32().unwrap()
     }
 }
