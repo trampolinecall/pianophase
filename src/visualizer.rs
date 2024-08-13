@@ -1,7 +1,7 @@
 use macroquad::{
     math::clamp,
     shapes::{draw_arc, draw_circle, draw_line, draw_rectangle},
-    text::{draw_text, draw_text_ex},
+    text::{draw_text_ex, Font, TextParams},
     window::clear_background,
 };
 use num_rational::{Ratio, Rational32};
@@ -13,7 +13,7 @@ use crate::{
     util::{lerp, remap},
     visualizer::{
         colors::ColorExt,
-        notation::{Font, Staff, StaffPosition, STEM_ABOVE_Y, STEM_BELOW_Y},
+        notation::{Staff, StaffPosition, STEM_ABOVE_Y, STEM_BELOW_Y},
     },
 };
 
@@ -21,12 +21,14 @@ mod colors;
 mod notation;
 
 pub struct Visualizer {
-    font: Font,
+    notation_font: notation::Font,
+    text_font: Font,
 }
 
 impl Visualizer {
     pub async fn new() -> Result<Visualizer, Box<dyn std::error::Error>> {
-        Ok(Visualizer { font: Font::load_bravura().await? })
+        let text_font = macroquad::text::load_ttf_font("data/Besley/static/Besley-Regular.ttf").await?;
+        Ok(Visualizer { notation_font: notation::Font::load_bravura().await?, text_font })
     }
 
     pub fn update(&mut self, timing: &Timing, music: &PianoPhase) {
@@ -37,25 +39,32 @@ impl Visualizer {
         let part1_segment_index = music.part1.find_segment_for_time(current_time);
         let part2_segment_index = music.part2.find_segment_for_time(current_time);
 
-        draw_status_text(&self.font, music, current_time, part1_segment_index, part2_segment_index);
+        draw_status_text(&self.text_font, &self.notation_font, music, current_time, part1_segment_index, part2_segment_index);
 
         const STAFF_RADIUS: f32 = 200.0;
         // TODO: adjust to window size
         if let Some(part1_segment_index) = part1_segment_index {
-            draw_wheel(&self.font, current_time, &music.part1.segments[part1_segment_index], 1280.0 * 0.25, 720.0 / 2.0, STAFF_RADIUS);
+            draw_wheel(&self.notation_font, current_time, &music.part1.segments[part1_segment_index], 1280.0 * 0.25, 720.0 / 2.0, STAFF_RADIUS);
         }
         if let Some(part2_segment_index) = part2_segment_index {
-            draw_wheel(&self.font, current_time, &music.part2.segments[part2_segment_index], 1280.0 * 0.75, 720.0 / 2.0, STAFF_RADIUS);
+            draw_wheel(&self.notation_font, current_time, &music.part2.segments[part2_segment_index], 1280.0 * 0.75, 720.0 / 2.0, STAFF_RADIUS);
         }
 
-        draw_in_sync_staff(&self.font, music, current_time);
-        draw_out_of_sync_staff(&self.font, music, current_time, part1_segment_index, part2_segment_index);
+        draw_in_sync_staff(&self.notation_font, music, current_time);
+        draw_out_of_sync_staff(&self.notation_font, music, current_time, part1_segment_index, part2_segment_index);
     }
 }
 
-fn draw_status_text(font: &Font, music: &PianoPhase, current_time: f32, part1_segment_index: Option<usize>, part2_segment_index: Option<usize>) {
+fn draw_status_text(
+    text_font: &Font,
+    notation_font: &notation::Font,
+    music: &PianoPhase,
+    current_time: f32,
+    part1_segment_index: Option<usize>,
+    part2_segment_index: Option<usize>,
+) {
     const FONT_SIZE: u16 = 24;
-    const LEFT_X: f32 = 0.0;
+    const LEFT_X: f32 = 10.0;
 
     let go = |segment: &Segment, part_name: &'static str, y_position: f32| {
         let status = if segment.speed != Ratio::ONE { "Phasing..." } else { "Steady" };
@@ -65,31 +74,35 @@ fn draw_status_text(font: &Font, music: &PianoPhase, current_time: f32, part1_se
         let current_measure = segment.find_measure(current_time).number + 1;
         let measures_in_segment = segment.repetitions;
 
-        let first_part_dims = draw_text(&format!("{part_name}: {status} "), LEFT_X, y_position, FONT_SIZE as f32, colors::FOREGROUND_COLOR);
+        let first_part_dims = draw_text_ex(
+            &format!("{part_name}: {status} "),
+            LEFT_X,
+            y_position,
+            TextParams { font: Some(text_font), font_size: FONT_SIZE, color: colors::FOREGROUND_COLOR, ..Default::default() },
+        );
         let eigth_note_dims = draw_text_ex(
             &smufl::Glyph::MetNote8thUp.codepoint().to_string(),
             LEFT_X + first_part_dims.width,
             y_position,
-            font.make_text_params_with_size(FONT_SIZE, colors::FOREGROUND_COLOR),
+            notation_font.make_text_params_with_size(FONT_SIZE, colors::FOREGROUND_COLOR),
         );
-        draw_text(
+        draw_text_ex(
             &format!(" = {bpm:.1} ({current_measure}/{measures_in_segment})"),
             LEFT_X + first_part_dims.width + eigth_note_dims.width,
             y_position,
-            FONT_SIZE as f32,
-            colors::FOREGROUND_COLOR,
+            TextParams { font: Some(text_font), font_size: FONT_SIZE, color: colors::FOREGROUND_COLOR, ..Default::default() },
         );
     };
 
     if let Some(part1_segment_index) = part1_segment_index {
-        go(&music.part1.segments[part1_segment_index], "Piano 1", 24.0);
+        go(&music.part1.segments[part1_segment_index], "Piano 1", 30.0);
     }
     if let Some(part2_segment_index) = part2_segment_index {
-        go(&music.part2.segments[part2_segment_index], "Piano 2", 48.0);
+        go(&music.part2.segments[part2_segment_index], "Piano 2", 60.0);
     }
 }
 
-fn draw_wheel(font: &Font, current_time: f32, segment: &Segment, center_x: f32, center_y: f32, staff_outer_radius: f32) {
+fn draw_wheel(font: &notation::Font, current_time: f32, segment: &Segment, center_x: f32, center_y: f32, staff_outer_radius: f32) {
     let staff = Staff::new(font, StaffPosition::Circular { center_x, center_y, outer_radius: staff_outer_radius }, 6);
     staff.draw(colors::FOREGROUND_COLOR);
 
@@ -150,7 +163,7 @@ fn draw_wheel(font: &Font, current_time: f32, segment: &Segment, center_x: f32, 
     }
 }
 
-fn draw_in_sync_staff(font: &Font, music: &PianoPhase, current_time: f32) {
+fn draw_in_sync_staff(font: &notation::Font, music: &PianoPhase, current_time: f32) {
     const STAFF_LEFT: f32 = 200.0;
     const STAFF_TOP_Y: f32 = 600.0;
     // TODO: calculate these positions instead of hardcoding them
@@ -222,7 +235,7 @@ fn draw_in_sync_staff(font: &Font, music: &PianoPhase, current_time: f32) {
 }
 
 fn draw_out_of_sync_staff(
-    font: &Font,
+    font: &notation::Font,
     music: &PianoPhase,
     current_time: f32,
     part1_segment_index: Option<usize>,
