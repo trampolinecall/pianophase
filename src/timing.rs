@@ -68,7 +68,7 @@ impl Timing {
 
     pub fn should_end(&self, music: &PianoPhase) -> bool {
         let last_note_end = music.part1.flattened.iter().chain(&music.part2.flattened).map(|n| n.time + n.length).max().unwrap();
-        // stop one second after everything is over
+        // stop one note after everything is over
         self.current_musical_time(music) > (last_note_end + Ratio::ONE).to_f32().unwrap()
     }
 }
