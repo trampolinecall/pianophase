@@ -126,7 +126,7 @@ fn draw_status_text(
     };
 
     if let Some(part1_segment_index) = part1_segment_index {
-        go(&music.part1.segments[part1_segment_index], "Piano 1", font_size  as f32 * 1.5);
+        go(&music.part1.segments[part1_segment_index], "Piano 1", font_size as f32 * 1.5);
     }
     if let Some(part2_segment_index) = part2_segment_index {
         go(&music.part2.segments[part2_segment_index], "Piano 2", font_size as f32 * 1.5 * 2.0);

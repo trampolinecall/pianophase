@@ -58,7 +58,7 @@ impl Exporter {
 
     pub fn export_midi(&self, music: &PianoPhase, output_path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>> {
         use midly::{
-            num::{u15, u24, u28, u7},
+            num::{u15, u24, u28, u4, u7},
             write_std, Format, Header, MetaMessage, MidiMessage, Timing, Track, TrackEvent, TrackEventKind,
         };
 
@@ -91,9 +91,10 @@ impl Exporter {
 
             new_events
         }
-        let convert_part = |part: &Part, track_number: u16| -> Track {
+        let convert_part = |part: &Part, track_number: u16, channel_number: u4| -> Track {
             let header_events = [
                 (0, TrackEventKind::Meta(MetaMessage::TrackNumber(Some(track_number)))),
+                (0, TrackEventKind::Meta(MetaMessage::MidiChannel(channel_number))),
                 (0, TrackEventKind::Meta(MetaMessage::Tempo(u24::try_from(60_000_000u32 / music.tempo as u32).unwrap()))),
                 (0, TrackEventKind::Meta(MetaMessage::TimeSignature(1, 2, 24 * 2, 8))), // metronome clicks every 2 quarter notes (every 2 notes)
             ];
@@ -106,7 +107,7 @@ impl Exporter {
                         (
                             convert_time_to_ticks(flattened_note.time),
                             TrackEventKind::Midi {
-                                channel: 0.into(),
+                                channel: channel_number,
                                 message: MidiMessage::NoteOn {
                                     key: flattened_note.pitch.into(),
                                     vel: u7::new((flattened_note.volume * u7::max_value().as_int() as f32).floor() as u8),
@@ -116,7 +117,7 @@ impl Exporter {
                         (
                             convert_time_to_ticks(flattened_note.time + flattened_note.length),
                             TrackEventKind::Midi {
-                                channel: 0.into(),
+                                channel: channel_number,
                                 message: MidiMessage::NoteOff { key: flattened_note.pitch.into(), vel: 0.into() },
                             },
                         ),
@@ -137,7 +138,7 @@ impl Exporter {
             ),
         };
 
-        write_std(&header, [&convert_part(&music.part1, 0), &convert_part(&music.part2, 1)], output_file)?;
+        write_std(&header, [&convert_part(&music.part1, 0, 0.into()), &convert_part(&music.part2, 1, 1.into())], output_file)?;
 
         Ok(())
     }
